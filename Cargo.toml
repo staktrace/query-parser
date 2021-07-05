@@ -1,0 +1,18 @@
+[package]
+name = "query-parser"
+version = "0.1.0"
+authors = ["Kartikaya Gupta"]
+edition = "2018"
+license = "0BSD"
+
+description = "A library to parse search queries"
+homepage = "https://github.com/staktrace/query-parser/blob/master/README.md"
+repository = "https://github.com/staktrace/query-parser"
+readme = "README.md"
+keywords = ["parser", "query", "search", "term"]
+categories = ["parsing", "command-line-interface"]
+
+[badges]
+maintenance = { status = "actively-developed" }
+
+[dependencies]
