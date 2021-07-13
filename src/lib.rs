@@ -50,6 +50,19 @@ enum ParseState {
     RawValue, // Once the value has been determined to be unquoted
 }
 
+impl ParseState {
+    fn is_negated(&self) -> bool {
+        match self {
+            Self::Negated |
+            Self::NegatedSingleQuote |
+            Self::NegatedDoubleQuote |
+            Self::NegatedRawToken |
+            Self::NegatedValue => true,
+            _ => false,
+        }
+    }
+}
+
 fn parse_tree(raw: &str) -> Vec<QueryTerm> {
     let mut result = Vec::new();
     let mut c = raw.chars();
@@ -78,6 +91,7 @@ fn parse_tree(raw: &str) -> Vec<QueryTerm> {
                 state = ParseState::RawToken;
                 token.push(*ch);
             }
+
             // Negated state handlers
             (ParseState::Negated, None) => {
                 result.push(QueryTerm::from_value("-"));
@@ -97,25 +111,33 @@ fn parse_tree(raw: &str) -> Vec<QueryTerm> {
                 state = ParseState::NegatedRawToken;
                 token.push(*ch);
             }
-            // Single/Double quoted state handlers
-            (ParseState::SingleQuote, None) => {
-                result.push(QueryTerm::from_value(format!("'{}", token)));
+
+            // [Negated] Single/Double quoted state handlers
+            (ParseState::SingleQuote, None) |
+            (ParseState::NegatedSingleQuote, None) => {
+                result.push(QueryTerm::from_value(format!("{}'{}", if state.is_negated() { "-" } else { "" }, token)));
                 return result;
             }
-            (ParseState::DoubleQuote, None) => {
-                result.push(QueryTerm::from_value(format!("\"{}", token)));
+            (ParseState::DoubleQuote, None) |
+            (ParseState::NegatedDoubleQuote, None) => {
+                result.push(QueryTerm::from_value(format!("{}\"{}", if state.is_negated() { "-" } else { "" }, token)));
                 return result;
             }
             (ParseState::SingleQuote, Some('\'')) |
-            (ParseState::DoubleQuote, Some('"')) => {
-                result.push(QueryTerm::from_value(token));
+            (ParseState::DoubleQuote, Some('"')) |
+            (ParseState::NegatedSingleQuote, Some('\'')) |
+            (ParseState::NegatedDoubleQuote, Some('"')) => {
+                result.push(QueryTerm::new(state.is_negated(), None, token));
                 token = String::new();
                 state = ParseState::Initial;
             }
             (ParseState::SingleQuote, Some(ref ch)) |
-            (ParseState::DoubleQuote, Some(ref ch)) => {
+            (ParseState::DoubleQuote, Some(ref ch)) |
+            (ParseState::NegatedSingleQuote, Some(ref ch)) |
+            (ParseState::NegatedDoubleQuote, Some(ref ch)) => {
                 token.push(*ch);
             }
+
             // Raw token state handlers
             (ParseState::RawToken, None) => {
                 result.push(QueryTerm::from_value(token));
@@ -134,25 +156,7 @@ fn parse_tree(raw: &str) -> Vec<QueryTerm> {
             (ParseState::RawToken, Some(ref ch)) => {
                 token.push(*ch);
             }
-            // Negated single/double quoted state handlers
-            (ParseState::NegatedSingleQuote, None) => {
-                result.push(QueryTerm::from_value(format!("-'{}", token)));
-                return result;
-            }
-            (ParseState::NegatedDoubleQuote, None) => {
-                result.push(QueryTerm::from_value(format!("-\"{}", token)));
-                return result;
-            }
-            (ParseState::NegatedSingleQuote, Some('\'')) |
-            (ParseState::NegatedDoubleQuote, Some('"')) => {
-                result.push(QueryTerm::new(true, None, token));
-                token = String::new();
-                state = ParseState::Initial;
-            }
-            (ParseState::NegatedSingleQuote, Some(ref ch)) |
-            (ParseState::NegatedDoubleQuote, Some(ref ch)) => {
-                token.push(*ch);
-            }
+
             // Negated raw token state handlers
             (ParseState::NegatedRawToken, None) => {
                 result.push(QueryTerm::new(true, None, token));
@@ -171,7 +175,8 @@ fn parse_tree(raw: &str) -> Vec<QueryTerm> {
             (ParseState::NegatedRawToken, Some(ref ch)) => {
                 token.push(*ch);
             }
-            // Value state handlers
+
+            // Value/raw-value state handlers
             (ParseState::Value, None) |
             (ParseState::RawValue, None) => {
                 result.push(QueryTerm::new(false, key, token));
