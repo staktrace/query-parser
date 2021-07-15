@@ -1,3 +1,4 @@
+#[derive(Debug, PartialEq)]
 pub struct Query {
     pub raw_query: String,
     pub terms: Vec<QueryTerm>,
@@ -31,7 +32,7 @@ impl QueryTerm {
 pub fn parse(raw: &str) -> Query {
     Query {
         raw_query: String::from(raw),
-        terms: parse_tree(raw),
+        terms: parse_terms(raw),
     }
 }
 
@@ -71,7 +72,7 @@ impl ParseState {
     }
 }
 
-fn parse_tree(raw: &str) -> Vec<QueryTerm> {
+fn parse_terms(raw: &str) -> Vec<QueryTerm> {
     let mut result = Vec::new();
 
     let mut state = ParseState::Initial;
