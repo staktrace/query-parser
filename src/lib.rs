@@ -5,10 +5,16 @@ pub struct Query {
 }
 
 #[derive(Debug, PartialEq)]
+pub enum TermValue {
+    Simple(String),
+    // in the future, other types like List or Range might be added
+}
+
+#[derive(Debug, PartialEq)]
 pub struct Term {
     pub negated: bool,
     pub key: Option<String>,
-    pub value: String,
+    pub value: TermValue,
 }
 
 impl Term {
@@ -16,7 +22,7 @@ impl Term {
         Term {
             negated,
             key: key.map(S::into),
-            value: value.into(),
+            value: TermValue::Simple(value.into()),
         }
     }
 
@@ -24,7 +30,7 @@ impl Term {
         Term {
             negated: false,
             key: None,
-            value: value.into(),
+            value: TermValue::Simple(value.into()),
         }
     }
 }
