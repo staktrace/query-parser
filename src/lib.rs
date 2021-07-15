@@ -289,6 +289,16 @@ mod tests {
     }
 
     #[test]
+    fn negations() {
+        assert_eq!(parse("-").terms, &[Term::new(false, None, "-")]);
+        assert_eq!(parse("- -").terms, &[Term::new(false, None, "-"), Term::new(false, None, "-")]);
+        assert_eq!(parse("--").terms, &[Term::new(true, None, "-")]);
+        assert_eq!(parse("---").terms, &[Term::new(true, None, "--")]);
+        assert_eq!(parse("--- ---").terms, &[Term::new(true, None, "--"), Term::new(true, None, "--")]);
+        assert_eq!(parse("---:---").terms, &[Term::new(true, Some("--"), "---")]);
+    }
+
+    #[test]
     fn quoted() {
         assert_eq!(parse("'hello' 'world'").terms, &[Term::new(false, None, "hello"), Term::new(false, None, "world")]);
         assert_eq!(parse(" 'hello''world' ").terms, &[Term::new(false, None, "hello"), Term::new(false, None, "world")]);
