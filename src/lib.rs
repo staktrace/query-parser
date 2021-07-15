@@ -35,7 +35,22 @@ impl Term {
     }
 }
 
+#[derive(Debug)]
+pub struct ParseOptions {
+}
+
+impl ParseOptions {
+    pub fn default() -> Self {
+        Self {
+        }
+    }
+}
+
 pub fn parse(raw: &str) -> Query {
+    parse_with_options(raw, ParseOptions::default())
+}
+
+pub fn parse_with_options(raw: &str, opts: &ParseOptions) -> Query {
     Query {
         raw_query: String::from(raw),
         terms: parse_terms(raw),
