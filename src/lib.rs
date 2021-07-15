@@ -1,19 +1,19 @@
 #[derive(Debug, PartialEq)]
 pub struct Query {
     pub raw_query: String,
-    pub terms: Vec<QueryTerm>,
+    pub terms: Vec<Term>,
 }
 
 #[derive(Debug, PartialEq)]
-pub struct QueryTerm {
+pub struct Term {
     pub negated: bool,
     pub key: Option<String>,
     pub value: String,
 }
 
-impl QueryTerm {
+impl Term {
     fn new<S: Into<String>>(negated: bool, key: Option<S>, value: S) -> Self {
-        QueryTerm {
+        Term {
             negated,
             key: key.map(S::into),
             value: value.into(),
@@ -21,7 +21,7 @@ impl QueryTerm {
     }
 
     fn from_value<S: Into<String>>(value: S) -> Self {
-        QueryTerm {
+        Term {
             negated: false,
             key: None,
             value: value.into(),
@@ -72,7 +72,7 @@ impl ParseState {
     }
 }
 
-fn parse_terms(raw: &str) -> Vec<QueryTerm> {
+fn parse_terms(raw: &str) -> Vec<Term> {
     let mut result = Vec::new();
 
     let mut state = ParseState::Initial;
@@ -105,7 +105,7 @@ fn parse_terms(raw: &str) -> Vec<QueryTerm> {
 
             // Negated state handlers
             (ParseState::Negated, None) => {
-                result.push(QueryTerm::from_value("-"));
+                result.push(Term::from_value("-"));
                 break;
             }
             (ParseState::Negated, Some('\'')) => {
@@ -115,7 +115,7 @@ fn parse_terms(raw: &str) -> Vec<QueryTerm> {
                 state = ParseState::NegatedDoubleQuote;
             }
             (ParseState::Negated, Some(ref ch)) if ch.is_ascii_whitespace() => {
-                result.push(QueryTerm::from_value("-"));
+                result.push(Term::from_value("-"));
                 state = ParseState::Initial;
             }
             (ParseState::Negated, Some(ref ch)) => {
@@ -126,19 +126,19 @@ fn parse_terms(raw: &str) -> Vec<QueryTerm> {
             // [Negated] Single/Double quoted state handlers
             (ParseState::SingleQuote, None) |
             (ParseState::NegatedSingleQuote, None) => {
-                result.push(QueryTerm::from_value(format!("{}'{}", if state.is_negated() { "-" } else { "" }, token)));
+                result.push(Term::from_value(format!("{}'{}", if state.is_negated() { "-" } else { "" }, token)));
                 break;
             }
             (ParseState::DoubleQuote, None) |
             (ParseState::NegatedDoubleQuote, None) => {
-                result.push(QueryTerm::from_value(format!("{}\"{}", if state.is_negated() { "-" } else { "" }, token)));
+                result.push(Term::from_value(format!("{}\"{}", if state.is_negated() { "-" } else { "" }, token)));
                 break;
             }
             (ParseState::SingleQuote, Some('\'')) |
             (ParseState::DoubleQuote, Some('"')) |
             (ParseState::NegatedSingleQuote, Some('\'')) |
             (ParseState::NegatedDoubleQuote, Some('"')) => {
-                result.push(QueryTerm::new(state.is_negated(), None, token));
+                result.push(Term::new(state.is_negated(), None, token));
                 token = String::new();
                 state = ParseState::Initial;
             }
@@ -151,7 +151,7 @@ fn parse_terms(raw: &str) -> Vec<QueryTerm> {
 
             // Raw token state handlers
             (ParseState::RawToken, None) => {
-                result.push(QueryTerm::from_value(token));
+                result.push(Term::from_value(token));
                 break;
             }
             (ParseState::RawToken, Some(':')) => {
@@ -160,7 +160,7 @@ fn parse_terms(raw: &str) -> Vec<QueryTerm> {
                 state = ParseState::Value;
             }
             (ParseState::RawToken, Some(ref ch)) if ch.is_ascii_whitespace() => {
-                result.push(QueryTerm::from_value(token));
+                result.push(Term::from_value(token));
                 token = String::new();
                 state = ParseState::Initial;
             }
@@ -170,7 +170,7 @@ fn parse_terms(raw: &str) -> Vec<QueryTerm> {
 
             // Negated raw token state handlers
             (ParseState::NegatedRawToken, None) => {
-                result.push(QueryTerm::new(true, None, token));
+                result.push(Term::new(true, None, token));
                 break;
             }
             (ParseState::NegatedRawToken, Some(':')) => {
@@ -179,7 +179,7 @@ fn parse_terms(raw: &str) -> Vec<QueryTerm> {
                 state = ParseState::NegatedValue;
             }
             (ParseState::NegatedRawToken, Some(ref ch)) if ch.is_ascii_whitespace() => {
-                result.push(QueryTerm::new(true, None, token));
+                result.push(Term::new(true, None, token));
                 token = String::new();
                 state = ParseState::Initial;
             }
@@ -192,7 +192,7 @@ fn parse_terms(raw: &str) -> Vec<QueryTerm> {
             (ParseState::RawValue, None) |
             (ParseState::NegatedValue, None) |
             (ParseState::NegatedRawValue, None) => {
-                result.push(QueryTerm::new(state.is_negated(), key, token));
+                result.push(Term::new(state.is_negated(), key, token));
                 break;
             }
             (ParseState::Value, Some('\'')) => {
@@ -213,7 +213,7 @@ fn parse_terms(raw: &str) -> Vec<QueryTerm> {
             (ParseState::NegatedRawValue, Some(ref ch))
                 if ch.is_ascii_whitespace() =>
             {
-                result.push(QueryTerm::new(state.is_negated(), key, token));
+                result.push(Term::new(state.is_negated(), key, token));
                 key = None;
                 token = String::new();
                 state = ParseState::Initial;
@@ -228,19 +228,19 @@ fn parse_terms(raw: &str) -> Vec<QueryTerm> {
 
             (ParseState::SingleQuotedValue, None) |
             (ParseState::NegatedSingleQuotedValue, None) => {
-                result.push(QueryTerm::new(state.is_negated(), key, format!("'{}", token)));
+                result.push(Term::new(state.is_negated(), key, format!("'{}", token)));
                 break;
             }
             (ParseState::DoubleQuotedValue, None) |
             (ParseState::NegatedDoubleQuotedValue, None) => {
-                result.push(QueryTerm::new(state.is_negated(), key, format!("\"{}", token)));
+                result.push(Term::new(state.is_negated(), key, format!("\"{}", token)));
                 break;
             }
             (ParseState::SingleQuotedValue, Some('\'')) |
             (ParseState::DoubleQuotedValue, Some('"')) |
             (ParseState::NegatedSingleQuotedValue, Some('\'')) |
             (ParseState::NegatedDoubleQuotedValue, Some('"')) => {
-                result.push(QueryTerm::new(state.is_negated(), key, token));
+                result.push(Term::new(state.is_negated(), key, token));
                 key = None;
                 token = String::new();
                 state = ParseState::Initial;
@@ -269,62 +269,62 @@ mod tests {
 
     #[test]
     fn quoted() {
-        assert_eq!(parse("'hello' 'world'").terms, &[QueryTerm::new(false, None, "hello"), QueryTerm::new(false, None, "world")]);
-        assert_eq!(parse(" 'hello''world' ").terms, &[QueryTerm::new(false, None, "hello"), QueryTerm::new(false, None, "world")]);
-        assert_eq!(parse("\"hello\" \"world\"").terms, &[QueryTerm::new(false, None, "hello"), QueryTerm::new(false, None, "world")]);
-        assert_eq!(parse(" \"hello\"\"world\" ").terms, &[QueryTerm::new(false, None, "hello"), QueryTerm::new(false, None, "world")]);
+        assert_eq!(parse("'hello' 'world'").terms, &[Term::new(false, None, "hello"), Term::new(false, None, "world")]);
+        assert_eq!(parse(" 'hello''world' ").terms, &[Term::new(false, None, "hello"), Term::new(false, None, "world")]);
+        assert_eq!(parse("\"hello\" \"world\"").terms, &[Term::new(false, None, "hello"), Term::new(false, None, "world")]);
+        assert_eq!(parse(" \"hello\"\"world\" ").terms, &[Term::new(false, None, "hello"), Term::new(false, None, "world")]);
 
-        assert_eq!(parse("-'hello' 'world'").terms, &[QueryTerm::new(true, None, "hello"), QueryTerm::new(false, None, "world")]);
-        assert_eq!(parse(" 'hello'-'world' ").terms, &[QueryTerm::new(false, None, "hello"), QueryTerm::new(true, None, "world")]);
-        assert_eq!(parse("\"hello\" -\"world\"").terms, &[QueryTerm::new(false, None, "hello"), QueryTerm::new(true, None, "world")]);
-        assert_eq!(parse(" -\"hello\"-\"world\" ").terms, &[QueryTerm::new(true, None, "hello"), QueryTerm::new(true, None, "world")]);
+        assert_eq!(parse("-'hello' 'world'").terms, &[Term::new(true, None, "hello"), Term::new(false, None, "world")]);
+        assert_eq!(parse(" 'hello'-'world' ").terms, &[Term::new(false, None, "hello"), Term::new(true, None, "world")]);
+        assert_eq!(parse("\"hello\" -\"world\"").terms, &[Term::new(false, None, "hello"), Term::new(true, None, "world")]);
+        assert_eq!(parse(" -\"hello\"-\"world\" ").terms, &[Term::new(true, None, "hello"), Term::new(true, None, "world")]);
     }
 
     #[test]
     fn raw_tokens() {
-        assert_eq!(parse("hello").terms, &[QueryTerm::from_value("hello")]);
-        assert_eq!(parse(" hello ").terms, &[QueryTerm::from_value("hello")]);
-        assert_eq!(parse(" hello world ").terms, &[QueryTerm::from_value("hello"), QueryTerm::from_value("world")]);
-        assert_eq!(parse("\rhello\nworld\t").terms, &[QueryTerm::from_value("hello"), QueryTerm::from_value("world")]);
+        assert_eq!(parse("hello").terms, &[Term::from_value("hello")]);
+        assert_eq!(parse(" hello ").terms, &[Term::from_value("hello")]);
+        assert_eq!(parse(" hello world ").terms, &[Term::from_value("hello"), Term::from_value("world")]);
+        assert_eq!(parse("\rhello\nworld\t").terms, &[Term::from_value("hello"), Term::from_value("world")]);
 
-        assert_eq!(parse(" -hello ").terms, &[QueryTerm::new(true, None, "hello")]);
-        assert_eq!(parse(" -hello-world ").terms, &[QueryTerm::new(true, None, "hello-world")]);
-        assert_eq!(parse(" -hello -world ").terms, &[QueryTerm::new(true, None, "hello"), QueryTerm::new(true, None, "world")]);
+        assert_eq!(parse(" -hello ").terms, &[Term::new(true, None, "hello")]);
+        assert_eq!(parse(" -hello-world ").terms, &[Term::new(true, None, "hello-world")]);
+        assert_eq!(parse(" -hello -world ").terms, &[Term::new(true, None, "hello"), Term::new(true, None, "world")]);
     }
 
     #[test]
     fn raw_values() {
-        assert_eq!(parse("key:value").terms, &[QueryTerm::new(false, Some("key"), "value")]);
-        assert_eq!(parse("key:value key2:value2").terms, &[QueryTerm::new(false, Some("key"), "value"), QueryTerm::new(false, Some("key2"), "value2")]);
-        assert_eq!(parse("key: anotherValue").terms, &[QueryTerm::new(false, Some("key"), ""), QueryTerm::new(false, None, "anotherValue")]);
-        assert_eq!(parse(" key:value ").terms, &[QueryTerm::new(false, Some("key"), "value")]);
+        assert_eq!(parse("key:value").terms, &[Term::new(false, Some("key"), "value")]);
+        assert_eq!(parse("key:value key2:value2").terms, &[Term::new(false, Some("key"), "value"), Term::new(false, Some("key2"), "value2")]);
+        assert_eq!(parse("key: anotherValue").terms, &[Term::new(false, Some("key"), ""), Term::new(false, None, "anotherValue")]);
+        assert_eq!(parse(" key:value ").terms, &[Term::new(false, Some("key"), "value")]);
 
-        assert_eq!(parse("-key:value").terms, &[QueryTerm::new(true, Some("key"), "value")]);
-        assert_eq!(parse(" -key:value ").terms, &[QueryTerm::new(true, Some("key"), "value")]);
-        assert_eq!(parse(" key:-value ").terms, &[QueryTerm::new(false, Some("key"), "-value")]);
-        assert_eq!(parse(" key:- ").terms, &[QueryTerm::new(false, Some("key"), "-")]);
+        assert_eq!(parse("-key:value").terms, &[Term::new(true, Some("key"), "value")]);
+        assert_eq!(parse(" -key:value ").terms, &[Term::new(true, Some("key"), "value")]);
+        assert_eq!(parse(" key:-value ").terms, &[Term::new(false, Some("key"), "-value")]);
+        assert_eq!(parse(" key:- ").terms, &[Term::new(false, Some("key"), "-")]);
     }
 
     #[test]
     fn quoted_values() {
-        assert_eq!(parse("key:'value'").terms, &[QueryTerm::new(false, Some("key"), "value")]);
-        assert_eq!(parse("key:\"value with spaces\"").terms, &[QueryTerm::new(false, Some("key"), "value with spaces")]);
-        assert_eq!(parse("key:\"value\" key2:'another value'").terms, &[QueryTerm::new(false, Some("key"), "value"), QueryTerm::new(false, Some("key2"), "another value")]);
+        assert_eq!(parse("key:'value'").terms, &[Term::new(false, Some("key"), "value")]);
+        assert_eq!(parse("key:\"value with spaces\"").terms, &[Term::new(false, Some("key"), "value with spaces")]);
+        assert_eq!(parse("key:\"value\" key2:'another value'").terms, &[Term::new(false, Some("key"), "value"), Term::new(false, Some("key2"), "another value")]);
 
-        assert_eq!(parse("-key:'value'").terms, &[QueryTerm::new(true, Some("key"), "value")]);
-        assert_eq!(parse("-key:\"value with spaces\"").terms, &[QueryTerm::new(true, Some("key"), "value with spaces")]);
-        assert_eq!(parse("key:\"value\" -key2:'another value'").terms, &[QueryTerm::new(false, Some("key"), "value"), QueryTerm::new(true, Some("key2"), "another value")]);
+        assert_eq!(parse("-key:'value'").terms, &[Term::new(true, Some("key"), "value")]);
+        assert_eq!(parse("-key:\"value with spaces\"").terms, &[Term::new(true, Some("key"), "value with spaces")]);
+        assert_eq!(parse("key:\"value\" -key2:'another value'").terms, &[Term::new(false, Some("key"), "value"), Term::new(true, Some("key2"), "another value")]);
     }
 
     #[test]
     fn end_unexpectedly() {
-        assert_eq!(parse(" -").terms, &[QueryTerm::new(false, None, "-")]);
-        assert_eq!(parse("'hello").terms, &[QueryTerm::new(false, None, "'hello")]);
-        assert_eq!(parse("\"hello ").terms, &[QueryTerm::new(false, None, "\"hello ")]);
-        assert_eq!(parse("-'hello").terms, &[QueryTerm::new(false, None, "-'hello")]);
-        assert_eq!(parse("-\"hello ").terms, &[QueryTerm::new(false, None, "-\"hello ")]);
+        assert_eq!(parse(" -").terms, &[Term::new(false, None, "-")]);
+        assert_eq!(parse("'hello").terms, &[Term::new(false, None, "'hello")]);
+        assert_eq!(parse("\"hello ").terms, &[Term::new(false, None, "\"hello ")]);
+        assert_eq!(parse("-'hello").terms, &[Term::new(false, None, "-'hello")]);
+        assert_eq!(parse("-\"hello ").terms, &[Term::new(false, None, "-\"hello ")]);
 
-        assert_eq!(parse("key:\"value ").terms, &[QueryTerm::new(false, Some("key"), "\"value ")]);
-        assert_eq!(parse("-key:'value ").terms, &[QueryTerm::new(true, Some("key"), "'value ")]);
+        assert_eq!(parse("key:\"value ").terms, &[Term::new(false, Some("key"), "\"value ")]);
+        assert_eq!(parse("-key:'value ").terms, &[Term::new(true, Some("key"), "'value ")]);
     }
 }
