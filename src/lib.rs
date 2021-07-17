@@ -326,9 +326,8 @@ fn parse_terms(raw: &str, opts: &ParseOptions) -> Vec<Term> {
             (ParseState::NegatedDoubleQuote, None) |
             (ParseState::NegatedSingleQuoteEscape, None) |
             (ParseState::NegatedDoubleQuoteEscape, None) => {
-                result.push(Term::from_value(format!(
-                    "{}{}{}{}",
-                    if state.is_negated() { "-" } else { "" },
+                result.push(Term::new(state.is_negated(), None, format!(
+                    "{}{}{}",
                     if state.is_single_quote() { "'" } else { "\"" },
                     opts.decode_unicode(token),
                     if state.is_escaped() { "\\" } else { "" },
@@ -568,9 +567,9 @@ mod tests {
         assert_eq!(parse("'hello\\").terms, &[Term::new(false, None, "'hello\\")]);
         assert_eq!(parse("\"hello ").terms, &[Term::new(false, None, "\"hello ")]);
         assert_eq!(parse("hello\\").terms, &[Term::new(false, None, "hello\\")]);
-        assert_eq!(parse("-'hello").terms, &[Term::new(false, None, "-'hello")]);
-        assert_eq!(parse("-'hello\\").terms, &[Term::new(false, None, "-'hello\\")]);
-        assert_eq!(parse("-\"hello ").terms, &[Term::new(false, None, "-\"hello ")]);
+        assert_eq!(parse("-'hello").terms, &[Term::new(true, None, "'hello")]);
+        assert_eq!(parse("-'hello\\").terms, &[Term::new(true, None, "'hello\\")]);
+        assert_eq!(parse("-\"hello ").terms, &[Term::new(true, None, "\"hello ")]);
         assert_eq!(parse("-hello\\").terms, &[Term::new(true, None, "hello\\")]);
 
         assert_eq!(parse("key:\"value ").terms, &[Term::new(false, Some("key"), "\"value ")]);
