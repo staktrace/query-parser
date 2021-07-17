@@ -106,6 +106,16 @@ impl ParseState {
             _ => false,
         }
     }
+
+    fn is_single_quote(&self) -> bool {
+        match self {
+            Self::SingleQuote |
+            Self::NegatedSingleQuote |
+            Self::SingleQuotedValue |
+            Self::NegatedSingleQuotedValue => true,
+            _ => false,
+        }
+    }
 }
 
 fn hex_to_nybble(hex: u8) -> u32 {
@@ -239,13 +249,15 @@ fn parse_terms(raw: &str, opts: &ParseOptions) -> Vec<Term> {
 
             // [Negated] Single/Double quoted state handlers
             (ParseState::SingleQuote, None) |
-            (ParseState::NegatedSingleQuote, None) => {
-                result.push(Term::from_value(format!("{}'{}", if state.is_negated() { "-" } else { "" }, opts.decode_unicode(token))));
-                break;
-            }
+            (ParseState::NegatedSingleQuote, None) |
             (ParseState::DoubleQuote, None) |
             (ParseState::NegatedDoubleQuote, None) => {
-                result.push(Term::from_value(format!("{}\"{}", if state.is_negated() { "-" } else { "" }, opts.decode_unicode(token))));
+                result.push(Term::from_value(format!(
+                    "{}{}{}",
+                    if state.is_negated() { "-" } else { "" },
+                    if state.is_single_quote() { "'" } else { "\"" },
+                    opts.decode_unicode(token)
+                )));
                 break;
             }
             (ParseState::SingleQuote, Some('\'')) |
@@ -341,13 +353,14 @@ fn parse_terms(raw: &str, opts: &ParseOptions) -> Vec<Term> {
             }
 
             (ParseState::SingleQuotedValue, None) |
-            (ParseState::NegatedSingleQuotedValue, None) => {
-                result.push(Term::new(state.is_negated(), key, format!("'{}", opts.decode_unicode(token))));
-                break;
-            }
+            (ParseState::NegatedSingleQuotedValue, None) |
             (ParseState::DoubleQuotedValue, None) |
             (ParseState::NegatedDoubleQuotedValue, None) => {
-                result.push(Term::new(state.is_negated(), key, format!("\"{}", opts.decode_unicode(token))));
+                result.push(Term::new(state.is_negated(), key, format!(
+                    "{}{}",
+                    if state.is_single_quote() { "'" } else { "\"" },
+                    opts.decode_unicode(token)
+                )));
                 break;
             }
             (ParseState::SingleQuotedValue, Some('\'')) |
