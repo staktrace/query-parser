@@ -65,7 +65,7 @@ impl ParseOptions {
     /// character, and all six are required (use zero-padding as needed). To represent
     /// a string like `\u001234` literally in a query string, one or more of the
     /// characters can be escaped via the unicode escape sequence; in this example
-    /// `\u005Cu001234` can be used to escape the initial backslash character
+    /// `\u00005Cu001234` can be used to escape the initial backslash character
     /// with the equivalent unicode escape.
     pub fn allow_unicode_escapes(&mut self, allow: bool) -> &mut ParseOptions {
         self.allow_unicode_escapes = allow;
