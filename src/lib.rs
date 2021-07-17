@@ -632,6 +632,18 @@ mod tests {
     }
 
     #[test]
+    fn parse_unicode_and_escape() {
+        let p = |x| parse_with_options(
+            x,
+            ParseOptions::default().allow_unicode_escapes(true).allow_backslash_quotes(true)
+        );
+
+        assert_eq!(p(r#"fred:"\'sup \u01F436""#).terms, &[Term::new(false, Some("fred"), "'sup \u{1F436}")]);
+        assert_eq!(p(r#"fred:"\'sup \\u01F436""#).terms, &[Term::new(false, Some("fred"), "'sup \u{1F436}")]);
+        assert_eq!(p(r#"fred:"\'sup \u00005cu01F436""#).terms, &[Term::new(false, Some("fred"), "'sup \\u01F436")]);
+    }
+
+    #[test]
     fn readme_example() {
         println!("{:?}", parse("from:foo -subject:'a long subject \\u00270c' baz"));
     }
