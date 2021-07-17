@@ -103,9 +103,13 @@ enum ParseState {
     RawValue, // Once the value has been determined to be unquoted
     SingleQuotedValue, // Once the value has been determined to be single-quoted
     DoubleQuotedValue, // Once the value has been determined to be double-quoted
+    SingleQuotedValueEscape, // Encountered backslash inside SingleQuotedValue
+    DoubleQuotedValueEscape, // Encountered backslash inside DoubleQuotedValue
     NegatedRawValue, // Once the value for a negated term has been determined to be unquoted
     NegatedSingleQuotedValue, // Once the value for a negated term has been determined to be single-quoted
     NegatedDoubleQuotedValue, // Once the value for a negated term has been determined to be double-quoted
+    NegatedSingleQuotedValueEscape, // Encountered backslash inside NegatedSingleQuotedValue
+    NegatedDoubleQuotedValueEscape, // Encountered backslash inside NegatedDoubleQuotedValue
 }
 
 impl ParseState {
@@ -113,14 +117,16 @@ impl ParseState {
         match self {
             Self::Negated |
             Self::NegatedSingleQuote |
-            Self::NegatedSingleQuoteEscape |
             Self::NegatedDoubleQuote |
+            Self::NegatedSingleQuoteEscape |
             Self::NegatedDoubleQuoteEscape |
             Self::NegatedRawToken |
             Self::NegatedValue |
             Self::NegatedRawValue |
             Self::NegatedSingleQuotedValue |
-            Self::NegatedDoubleQuotedValue => true,
+            Self::NegatedDoubleQuotedValue |
+            Self::NegatedSingleQuotedValueEscape |
+            Self::NegatedDoubleQuotedValueEscape => true,
             _ => false,
         }
     }
@@ -132,7 +138,9 @@ impl ParseState {
             Self::NegatedSingleQuote |
             Self::NegatedSingleQuoteEscape |
             Self::SingleQuotedValue |
-            Self::NegatedSingleQuotedValue => true,
+            Self::SingleQuotedValueEscape |
+            Self::NegatedSingleQuotedValue |
+            Self::NegatedSingleQuotedValueEscape => true,
             _ => false,
         }
     }
@@ -143,6 +151,10 @@ impl ParseState {
             ParseState::DoubleQuote => ParseState::DoubleQuoteEscape,
             ParseState::NegatedSingleQuote => ParseState::NegatedSingleQuoteEscape,
             ParseState::NegatedDoubleQuote => ParseState::NegatedDoubleQuoteEscape,
+            ParseState::SingleQuotedValue => ParseState::SingleQuotedValueEscape,
+            ParseState::DoubleQuotedValue => ParseState::DoubleQuotedValueEscape,
+            ParseState::NegatedSingleQuotedValue => ParseState::NegatedSingleQuotedValueEscape,
+            ParseState::NegatedDoubleQuotedValue => ParseState::NegatedDoubleQuotedValueEscape,
             _ => panic!("Unescapable state"),
         }
     }
@@ -153,6 +165,10 @@ impl ParseState {
             ParseState::DoubleQuoteEscape => ParseState::DoubleQuote,
             ParseState::NegatedSingleQuoteEscape => ParseState::NegatedSingleQuote,
             ParseState::NegatedDoubleQuoteEscape => ParseState::NegatedDoubleQuote,
+            ParseState::SingleQuotedValueEscape => ParseState::SingleQuotedValue,
+            ParseState::DoubleQuotedValueEscape => ParseState::DoubleQuotedValue,
+            ParseState::NegatedSingleQuotedValueEscape => ParseState::NegatedSingleQuotedValue,
+            ParseState::NegatedDoubleQuotedValueEscape => ParseState::NegatedDoubleQuotedValue,
             _ => panic!("Unescaped state"),
         }
     }
@@ -162,7 +178,11 @@ impl ParseState {
             Self::SingleQuoteEscape |
             Self::DoubleQuoteEscape |
             Self::NegatedSingleQuoteEscape |
-            Self::NegatedDoubleQuoteEscape => true,
+            Self::NegatedDoubleQuoteEscape |
+            Self::SingleQuotedValueEscape |
+            Self::DoubleQuotedValueEscape |
+            Self::NegatedSingleQuotedValueEscape |
+            Self::NegatedDoubleQuotedValueEscape => true,
             _ => false,
         }
     }
@@ -422,15 +442,30 @@ fn parse_terms(raw: &str, opts: &ParseOptions) -> Vec<Term> {
             }
 
             (ParseState::SingleQuotedValue, None) |
-            (ParseState::NegatedSingleQuotedValue, None) |
             (ParseState::DoubleQuotedValue, None) |
-            (ParseState::NegatedDoubleQuotedValue, None) => {
+            (ParseState::SingleQuotedValueEscape, None) |
+            (ParseState::DoubleQuotedValueEscape, None) |
+            (ParseState::NegatedSingleQuotedValue, None) |
+            (ParseState::NegatedDoubleQuotedValue, None) |
+            (ParseState::NegatedSingleQuotedValueEscape, None) |
+            (ParseState::NegatedDoubleQuotedValueEscape, None) => {
                 result.push(Term::new(state.is_negated(), key, format!(
-                    "{}{}",
+                    "{}{}{}",
                     if state.is_single_quote() { "'" } else { "\"" },
-                    opts.decode_unicode(token)
+                    opts.decode_unicode(token),
+                    if state.is_escaped() { "\\" } else { "" },
                 )));
                 break;
+            }
+            (ParseState::SingleQuotedValueEscape, Some(ref ch)) |
+            (ParseState::DoubleQuotedValueEscape, Some(ref ch)) |
+            (ParseState::NegatedSingleQuotedValueEscape, Some(ref ch)) |
+            (ParseState::NegatedDoubleQuotedValueEscape, Some(ref ch)) => {
+                if !(*ch == '\'' || *ch == '"' || *ch == '\\') {
+                    token.push('\\');
+                }
+                token.push(*ch);
+                state = state.unescape();
             }
             (ParseState::SingleQuotedValue, Some('\'')) |
             (ParseState::DoubleQuotedValue, Some('"')) |
@@ -445,7 +480,11 @@ fn parse_terms(raw: &str, opts: &ParseOptions) -> Vec<Term> {
             (ParseState::DoubleQuotedValue, Some(ref ch)) |
             (ParseState::NegatedSingleQuotedValue, Some(ref ch)) |
             (ParseState::NegatedDoubleQuotedValue, Some(ref ch)) => {
-                token.push(*ch);
+                if opts.allow_backslash_quotes && *ch == '\\' {
+                    state = state.escape();
+                } else {
+                    token.push(*ch);
+                }
             }
         }
     }
@@ -574,6 +613,23 @@ mod tests {
 
         assert_eq!(pe(r#"in\"a\\raw\nword"#).terms, &[Term::new(false, None, "in\\\"a\\\\raw\\nword")]);
         assert_eq!(p(r#"in\"a\\raw\nword"#).terms, &[Term::new(false, None, "in\\\"a\\\\raw\\nword")]);
+
+        assert_eq!(pe(r#"fred:'\'hi\''"#).terms, &[Term::new(false, Some("fred"), "'hi'")]);
+        assert_eq!(pe(r#"fred:"\'hi\'""#).terms, &[Term::new(false, Some("fred"), "'hi'")]);
+        assert_eq!(pe(r#"fred:"\"hi\"""#).terms, &[Term::new(false, Some("fred"), "\"hi\"")]);
+        assert_eq!(pe(r#"fred:'\"hi\"'"#).terms, &[Term::new(false, Some("fred"), "\"hi\"")]);
+        assert_eq!(pe(r#"back:'slashes \\ \n'"#).terms, &[Term::new(false, Some("back"), "slashes \\ \\n")]);
+        assert_eq!(pe(r#"back:"slashes \\ \n""#).terms, &[Term::new(false, Some("back"), "slashes \\ \\n")]);
+
+        assert_eq!(p(r#"fred:'\'hi\''"#).terms, &[Term::new(false, Some("fred"), "\\"), Term::new(false, None, "hi\\''")]);
+        assert_eq!(p(r#"fred:"\'hi\'""#).terms, &[Term::new(false, Some("fred"), "\\'hi\\'")]);
+        assert_eq!(p(r#"fred:"\"hi\"""#).terms, &[Term::new(false, Some("fred"), "\\"), Term::new(false, None, "hi\\\"\"")]);
+        assert_eq!(p(r#"fred:'\"hi\"'"#).terms, &[Term::new(false, Some("fred"), "\\\"hi\\\"")]);
+        assert_eq!(p(r#"back:'slashes \\ \n'"#).terms, &[Term::new(false, Some("back"), "slashes \\\\ \\n")]);
+        assert_eq!(p(r#"back:"slashes \\ \n""#).terms, &[Term::new(false, Some("back"), "slashes \\\\ \\n")]);
+
+        assert_eq!(pe(r#"raw:in\"a\\raw\nword"#).terms, &[Term::new(false, Some("raw"), "in\\\"a\\\\raw\\nword")]);
+        assert_eq!(p(r#"raw:in\"a\\raw\nword"#).terms, &[Term::new(false, Some("raw"), "in\\\"a\\\\raw\\nword")]);
     }
 
     #[test]
