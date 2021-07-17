@@ -466,4 +466,9 @@ mod tests {
         assert_eq!(p("\\u002021:'\\u002022 \\u002023'").terms, &[Term::new(false, Some("\\u002021"), "\\u002022 \\u002023")]);
         assert_eq!(pu("\\u002021:'\\u002022 \\u002023'").terms, &[Term::new(false, Some("\\u002021"), "\u{2022} \u{2023}")]);
     }
+
+    #[test]
+    fn readme_example() {
+        println!("{:?}", parse("from:foo -subject:'a long subject \\u00270c' baz"));
+    }
 }
