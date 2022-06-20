@@ -430,6 +430,12 @@ mod tests {
     }
 
     #[test]
+    fn double_colons() {
+        assert_eq!(parse("Class::method").terms, &[Term::new(false, Some("Class"), ":method")]);
+        assert_eq!(parse("'Class::method'").terms, &[Term::new(false, None, "Class::method")]);
+    }
+
+    #[test]
     fn quoted_values() {
         assert_eq!(parse("key:'value'").terms, &[Term::new(false, Some("key"), "value")]);
         assert_eq!(parse("key:\"value with spaces\"").terms, &[Term::new(false, Some("key"), "value with spaces")]);
