@@ -149,35 +149,35 @@ enum ParseState {
 
 impl ParseState {
     fn is_negated(&self) -> bool {
-        match self {
+        matches!(
+            self,
             Self::Negated
-            | Self::NegatedSingleQuote
-            | Self::NegatedDoubleQuote
-            | Self::NegatedSingleQuoteEscape
-            | Self::NegatedDoubleQuoteEscape
-            | Self::NegatedRawToken
-            | Self::NegatedValue
-            | Self::NegatedRawValue
-            | Self::NegatedSingleQuotedValue
-            | Self::NegatedDoubleQuotedValue
-            | Self::NegatedSingleQuotedValueEscape
-            | Self::NegatedDoubleQuotedValueEscape => true,
-            _ => false,
-        }
+                | Self::NegatedSingleQuote
+                | Self::NegatedDoubleQuote
+                | Self::NegatedSingleQuoteEscape
+                | Self::NegatedDoubleQuoteEscape
+                | Self::NegatedRawToken
+                | Self::NegatedValue
+                | Self::NegatedRawValue
+                | Self::NegatedSingleQuotedValue
+                | Self::NegatedDoubleQuotedValue
+                | Self::NegatedSingleQuotedValueEscape
+                | Self::NegatedDoubleQuotedValueEscape
+        )
     }
 
     fn is_single_quote(&self) -> bool {
-        match self {
+        matches!(
+            self,
             Self::SingleQuote
-            | Self::SingleQuoteEscape
-            | Self::NegatedSingleQuote
-            | Self::NegatedSingleQuoteEscape
-            | Self::SingleQuotedValue
-            | Self::SingleQuotedValueEscape
-            | Self::NegatedSingleQuotedValue
-            | Self::NegatedSingleQuotedValueEscape => true,
-            _ => false,
-        }
+                | Self::SingleQuoteEscape
+                | Self::NegatedSingleQuote
+                | Self::NegatedSingleQuoteEscape
+                | Self::SingleQuotedValue
+                | Self::SingleQuotedValueEscape
+                | Self::NegatedSingleQuotedValue
+                | Self::NegatedSingleQuotedValueEscape
+        )
     }
 
     fn escape(&self) -> Self {
@@ -209,17 +209,17 @@ impl ParseState {
     }
 
     fn is_escaped(&self) -> bool {
-        match self {
+        matches!(
+            self,
             Self::SingleQuoteEscape
-            | Self::DoubleQuoteEscape
-            | Self::NegatedSingleQuoteEscape
-            | Self::NegatedDoubleQuoteEscape
-            | Self::SingleQuotedValueEscape
-            | Self::DoubleQuotedValueEscape
-            | Self::NegatedSingleQuotedValueEscape
-            | Self::NegatedDoubleQuotedValueEscape => true,
-            _ => false,
-        }
+                | Self::DoubleQuoteEscape
+                | Self::NegatedSingleQuoteEscape
+                | Self::NegatedDoubleQuoteEscape
+                | Self::SingleQuotedValueEscape
+                | Self::DoubleQuotedValueEscape
+                | Self::NegatedSingleQuotedValueEscape
+                | Self::NegatedDoubleQuotedValueEscape
+        )
     }
 }
 
@@ -255,7 +255,7 @@ fn decode_unicode_escape(s: &str, ix: usize) -> Option<char> {
     None
 }
 
-fn decode_unicode_escapes<'a>(mut s: &'a str) -> Cow<'a, str> {
+fn decode_unicode_escapes(mut s: &str) -> Cow<str> {
     let mut ret = Cow::Borrowed(s);
     loop {
         if let Some(ix) = s.find('\\') {
@@ -285,7 +285,7 @@ fn decode_unicode_escapes<'a>(mut s: &'a str) -> Cow<'a, str> {
         }
         break;
     }
-    return ret;
+    ret
 }
 
 impl ParseOptions {
