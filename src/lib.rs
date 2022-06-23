@@ -112,37 +112,35 @@ pub fn parse_with_options(raw: &str, opts: &ParseOptions) -> Query {
                 terms,
             }
         }
-        (terms, None) => {
-            Query {
-                raw_query: String::from(raw),
-                terms,
-            }
-        }
+        (terms, None) => Query {
+            raw_query: String::from(raw),
+            terms,
+        },
     }
 }
 
 #[derive(Clone, Copy, Debug)]
 enum ParseState {
-    Initial, // before a new term is processed
-    Negated, // term started with a '-' character
-    SingleQuote, // term started with a single quote
-    DoubleQuote, // term started with a double quote
-    SingleQuoteEscape, // encountered backslash inside a single-quoted term
-    DoubleQuoteEscape, // encountered backslash inside a double-quoted term
-    RawToken, // term started without quoting
-    NegatedSingleQuote, // term started with a '-' followed by a single quote
-    NegatedDoubleQuote, // term started with a '-' followed by a double quote
-    NegatedSingleQuoteEscape, // encountered backslash inside NegatedSingleQuote
-    NegatedDoubleQuoteEscape, // encountered backslash inside NegatedDoubleQuote
-    NegatedRawToken, // term started with a '-' followed by unquoted characters
-    Value, // after encountering the ':' to separate key from value
-    NegatedValue, // after encountering the ':' to separated negated key from value
-    RawValue, // Once the value has been determined to be unquoted
+    Initial,                        // before a new term is processed
+    Negated,                        // term started with a '-' character
+    SingleQuote,                    // term started with a single quote
+    DoubleQuote,                    // term started with a double quote
+    SingleQuoteEscape,              // encountered backslash inside a single-quoted term
+    DoubleQuoteEscape,              // encountered backslash inside a double-quoted term
+    RawToken,                       // term started without quoting
+    NegatedSingleQuote,             // term started with a '-' followed by a single quote
+    NegatedDoubleQuote,             // term started with a '-' followed by a double quote
+    NegatedSingleQuoteEscape,       // encountered backslash inside NegatedSingleQuote
+    NegatedDoubleQuoteEscape,       // encountered backslash inside NegatedDoubleQuote
+    NegatedRawToken,                // term started with a '-' followed by unquoted characters
+    Value,                          // after encountering the ':' to separate key from value
+    NegatedValue,      // after encountering the ':' to separated negated key from value
+    RawValue,          // Once the value has been determined to be unquoted
     SingleQuotedValue, // Once the value has been determined to be single-quoted
     DoubleQuotedValue, // Once the value has been determined to be double-quoted
     SingleQuotedValueEscape, // Encountered backslash inside SingleQuotedValue
     DoubleQuotedValueEscape, // Encountered backslash inside DoubleQuotedValue
-    NegatedRawValue, // Once the value for a negated term has been determined to be unquoted
+    NegatedRawValue,   // Once the value for a negated term has been determined to be unquoted
     NegatedSingleQuotedValue, // Once the value for a negated term has been determined to be single-quoted
     NegatedDoubleQuotedValue, // Once the value for a negated term has been determined to be double-quoted
     NegatedSingleQuotedValueEscape, // Encountered backslash inside NegatedSingleQuotedValue
@@ -152,32 +150,32 @@ enum ParseState {
 impl ParseState {
     fn is_negated(&self) -> bool {
         match self {
-            Self::Negated |
-            Self::NegatedSingleQuote |
-            Self::NegatedDoubleQuote |
-            Self::NegatedSingleQuoteEscape |
-            Self::NegatedDoubleQuoteEscape |
-            Self::NegatedRawToken |
-            Self::NegatedValue |
-            Self::NegatedRawValue |
-            Self::NegatedSingleQuotedValue |
-            Self::NegatedDoubleQuotedValue |
-            Self::NegatedSingleQuotedValueEscape |
-            Self::NegatedDoubleQuotedValueEscape => true,
+            Self::Negated
+            | Self::NegatedSingleQuote
+            | Self::NegatedDoubleQuote
+            | Self::NegatedSingleQuoteEscape
+            | Self::NegatedDoubleQuoteEscape
+            | Self::NegatedRawToken
+            | Self::NegatedValue
+            | Self::NegatedRawValue
+            | Self::NegatedSingleQuotedValue
+            | Self::NegatedDoubleQuotedValue
+            | Self::NegatedSingleQuotedValueEscape
+            | Self::NegatedDoubleQuotedValueEscape => true,
             _ => false,
         }
     }
 
     fn is_single_quote(&self) -> bool {
         match self {
-            Self::SingleQuote |
-            Self::SingleQuoteEscape |
-            Self::NegatedSingleQuote |
-            Self::NegatedSingleQuoteEscape |
-            Self::SingleQuotedValue |
-            Self::SingleQuotedValueEscape |
-            Self::NegatedSingleQuotedValue |
-            Self::NegatedSingleQuotedValueEscape => true,
+            Self::SingleQuote
+            | Self::SingleQuoteEscape
+            | Self::NegatedSingleQuote
+            | Self::NegatedSingleQuoteEscape
+            | Self::SingleQuotedValue
+            | Self::SingleQuotedValueEscape
+            | Self::NegatedSingleQuotedValue
+            | Self::NegatedSingleQuotedValueEscape => true,
             _ => false,
         }
     }
@@ -212,14 +210,14 @@ impl ParseState {
 
     fn is_escaped(&self) -> bool {
         match self {
-            Self::SingleQuoteEscape |
-            Self::DoubleQuoteEscape |
-            Self::NegatedSingleQuoteEscape |
-            Self::NegatedDoubleQuoteEscape |
-            Self::SingleQuotedValueEscape |
-            Self::DoubleQuotedValueEscape |
-            Self::NegatedSingleQuotedValueEscape |
-            Self::NegatedDoubleQuotedValueEscape => true,
+            Self::SingleQuoteEscape
+            | Self::DoubleQuoteEscape
+            | Self::NegatedSingleQuoteEscape
+            | Self::NegatedDoubleQuoteEscape
+            | Self::SingleQuotedValueEscape
+            | Self::DoubleQuotedValueEscape
+            | Self::NegatedSingleQuotedValueEscape
+            | Self::NegatedDoubleQuotedValueEscape => true,
             _ => false,
         }
     }
@@ -236,21 +234,21 @@ fn hex_to_nybble(hex: u8) -> u32 {
 
 fn decode_unicode_escape(s: &str, ix: usize) -> Option<char> {
     let bytes = s.as_bytes();
-    if ix + 7 < s.len() &&
-        bytes[ix + 1] == b'u' &&
-        bytes[ix + 2].is_ascii_hexdigit() &&
-        bytes[ix + 3].is_ascii_hexdigit() &&
-        bytes[ix + 4].is_ascii_hexdigit() &&
-        bytes[ix + 5].is_ascii_hexdigit() &&
-        bytes[ix + 6].is_ascii_hexdigit() &&
-        bytes[ix + 7].is_ascii_hexdigit()
+    if ix + 7 < s.len()
+        && bytes[ix + 1] == b'u'
+        && bytes[ix + 2].is_ascii_hexdigit()
+        && bytes[ix + 3].is_ascii_hexdigit()
+        && bytes[ix + 4].is_ascii_hexdigit()
+        && bytes[ix + 5].is_ascii_hexdigit()
+        && bytes[ix + 6].is_ascii_hexdigit()
+        && bytes[ix + 7].is_ascii_hexdigit()
     {
-        let uchar = (hex_to_nybble(bytes[ix + 2]) << 20) |
-            (hex_to_nybble(bytes[ix + 3]) << 16) |
-            (hex_to_nybble(bytes[ix + 4]) << 12) |
-            (hex_to_nybble(bytes[ix + 5]) << 8) |
-            (hex_to_nybble(bytes[ix + 6]) << 4) |
-            (hex_to_nybble(bytes[ix + 7]));
+        let uchar = (hex_to_nybble(bytes[ix + 2]) << 20)
+            | (hex_to_nybble(bytes[ix + 3]) << 16)
+            | (hex_to_nybble(bytes[ix + 4]) << 12)
+            | (hex_to_nybble(bytes[ix + 5]) << 8)
+            | (hex_to_nybble(bytes[ix + 6]) << 4)
+            | (hex_to_nybble(bytes[ix + 7]));
         return std::char::from_u32(uchar);
     }
 
@@ -380,40 +378,44 @@ fn parse_terms(raw: &str, opts: &ParseOptions) -> (Vec<Term>, Option<String>) {
             }
 
             // [Negated] Single/Double quoted state handlers
-            (ParseState::SingleQuote, None) |
-            (ParseState::DoubleQuote, None) |
-            (ParseState::SingleQuoteEscape, None) |
-            (ParseState::DoubleQuoteEscape, None) |
-            (ParseState::NegatedSingleQuote, None) |
-            (ParseState::NegatedDoubleQuote, None) |
-            (ParseState::NegatedSingleQuoteEscape, None) |
-            (ParseState::NegatedDoubleQuoteEscape, None) => {
-                result.push(Term::new(state.is_negated(), None, format!(
-                    "{}{}{}",
-                    if state.is_single_quote() { "'" } else { "\"" },
-                    opts.decode_unicode(token),
-                    if state.is_escaped() { "\\" } else { "" },
-                )));
+            (ParseState::SingleQuote, None)
+            | (ParseState::DoubleQuote, None)
+            | (ParseState::SingleQuoteEscape, None)
+            | (ParseState::DoubleQuoteEscape, None)
+            | (ParseState::NegatedSingleQuote, None)
+            | (ParseState::NegatedDoubleQuote, None)
+            | (ParseState::NegatedSingleQuoteEscape, None)
+            | (ParseState::NegatedDoubleQuoteEscape, None) => {
+                result.push(Term::new(
+                    state.is_negated(),
+                    None,
+                    format!(
+                        "{}{}{}",
+                        if state.is_single_quote() { "'" } else { "\"" },
+                        opts.decode_unicode(token),
+                        if state.is_escaped() { "\\" } else { "" },
+                    ),
+                ));
                 break;
             }
-            (ParseState::SingleQuoteEscape, Some(ref ch)) |
-            (ParseState::DoubleQuoteEscape, Some(ref ch)) |
-            (ParseState::NegatedSingleQuoteEscape, Some(ref ch)) |
-            (ParseState::NegatedDoubleQuoteEscape, Some(ref ch)) => {
+            (ParseState::SingleQuoteEscape, Some(ref ch))
+            | (ParseState::DoubleQuoteEscape, Some(ref ch))
+            | (ParseState::NegatedSingleQuoteEscape, Some(ref ch))
+            | (ParseState::NegatedDoubleQuoteEscape, Some(ref ch)) => {
                 if !(*ch == '\'' || *ch == '"' || *ch == '\\') {
                     token.push('\\');
                 }
                 token.push(*ch);
                 state = state.unescape();
             }
-            (ParseState::SingleQuote, Some(qc @ '\'')) |
-            (ParseState::DoubleQuote, Some(qc @ '"')) |
-            (ParseState::NegatedSingleQuote, Some(qc @ '\'')) |
-            (ParseState::NegatedDoubleQuote, Some(qc @ '"')) |
-            (ParseState::SingleQuotedValue, Some(qc @ '\'')) |
-            (ParseState::DoubleQuotedValue, Some(qc @ '"')) |
-            (ParseState::NegatedSingleQuotedValue, Some(qc @ '\'')) |
-            (ParseState::NegatedDoubleQuotedValue, Some(qc @ '"')) => {
+            (ParseState::SingleQuote, Some(qc @ '\''))
+            | (ParseState::DoubleQuote, Some(qc @ '"'))
+            | (ParseState::NegatedSingleQuote, Some(qc @ '\''))
+            | (ParseState::NegatedDoubleQuote, Some(qc @ '"'))
+            | (ParseState::SingleQuotedValue, Some(qc @ '\''))
+            | (ParseState::DoubleQuotedValue, Some(qc @ '"'))
+            | (ParseState::NegatedSingleQuotedValue, Some(qc @ '\''))
+            | (ParseState::NegatedDoubleQuotedValue, Some(qc @ '"')) => {
                 // We have a simple heuristic for noting potential typos as it
                 // relates to closing quotes: if there's not a space or the end
                 // of the string after the quote (and we're currently in a
@@ -432,7 +434,9 @@ fn parse_terms(raw: &str, opts: &ParseOptions) -> (Vec<Term>, Option<String>) {
                         (Some(ws), _) if ws.is_ascii_whitespace() => {}
                         // If there's a non-whitespace character followed by whitespace,
                         // that's transposition.
-                        (Some(ch), Some (ws)) if !ch.is_ascii_whitespace() && ws.is_ascii_whitespace() => {
+                        (Some(ch), Some(ws))
+                            if !ch.is_ascii_whitespace() && ws.is_ascii_whitespace() =>
+                        {
                             corrected.push(ch);
                             corrected.push(qc);
                             skip_propagating = 2;
@@ -450,15 +454,19 @@ fn parse_terms(raw: &str, opts: &ParseOptions) -> (Vec<Term>, Option<String>) {
                         }
                     }
                 }
-                result.push(Term::new(state.is_negated(), key, opts.decode_unicode(token)));
+                result.push(Term::new(
+                    state.is_negated(),
+                    key,
+                    opts.decode_unicode(token),
+                ));
                 key = None;
                 token = String::new();
                 state = ParseState::Initial;
             }
-            (ParseState::SingleQuote, Some(ref ch)) |
-            (ParseState::DoubleQuote, Some(ref ch)) |
-            (ParseState::NegatedSingleQuote, Some(ref ch)) |
-            (ParseState::NegatedDoubleQuote, Some(ref ch)) => {
+            (ParseState::SingleQuote, Some(ref ch))
+            | (ParseState::DoubleQuote, Some(ref ch))
+            | (ParseState::NegatedSingleQuote, Some(ref ch))
+            | (ParseState::NegatedDoubleQuote, Some(ref ch)) => {
                 if opts.allow_backslash_quotes && *ch == '\\' {
                     state = state.escape();
                 } else {
@@ -505,11 +513,15 @@ fn parse_terms(raw: &str, opts: &ParseOptions) -> (Vec<Term>, Option<String>) {
             }
 
             // Value/raw-value state handlers
-            (ParseState::Value, None) |
-            (ParseState::RawValue, None) |
-            (ParseState::NegatedValue, None) |
-            (ParseState::NegatedRawValue, None) => {
-                result.push(Term::new(state.is_negated(), key, opts.decode_unicode(token)));
+            (ParseState::Value, None)
+            | (ParseState::RawValue, None)
+            | (ParseState::NegatedValue, None)
+            | (ParseState::NegatedRawValue, None) => {
+                result.push(Term::new(
+                    state.is_negated(),
+                    key,
+                    opts.decode_unicode(token),
+                ));
                 break;
             }
             (ParseState::Value, Some('\'')) => {
@@ -524,55 +536,67 @@ fn parse_terms(raw: &str, opts: &ParseOptions) -> (Vec<Term>, Option<String>) {
             (ParseState::NegatedValue, Some('"')) => {
                 state = ParseState::NegatedDoubleQuotedValue;
             }
-            (ParseState::Value, Some(ref ch)) |
-            (ParseState::RawValue, Some(ref ch)) |
-            (ParseState::NegatedValue, Some(ref ch)) |
-            (ParseState::NegatedRawValue, Some(ref ch))
+            (ParseState::Value, Some(ref ch))
+            | (ParseState::RawValue, Some(ref ch))
+            | (ParseState::NegatedValue, Some(ref ch))
+            | (ParseState::NegatedRawValue, Some(ref ch))
                 if ch.is_ascii_whitespace() =>
             {
-                result.push(Term::new(state.is_negated(), key, opts.decode_unicode(token)));
+                result.push(Term::new(
+                    state.is_negated(),
+                    key,
+                    opts.decode_unicode(token),
+                ));
                 key = None;
                 token = String::new();
                 state = ParseState::Initial;
             }
-            (ParseState::Value, Some(ref ch)) |
-            (ParseState::RawValue, Some(ref ch)) |
-            (ParseState::NegatedValue, Some(ref ch)) |
-            (ParseState::NegatedRawValue, Some(ref ch)) => {
+            (ParseState::Value, Some(ref ch))
+            | (ParseState::RawValue, Some(ref ch))
+            | (ParseState::NegatedValue, Some(ref ch))
+            | (ParseState::NegatedRawValue, Some(ref ch)) => {
                 token.push(*ch);
-                state = if state.is_negated() { ParseState::NegatedRawValue } else { ParseState::RawValue };
+                state = if state.is_negated() {
+                    ParseState::NegatedRawValue
+                } else {
+                    ParseState::RawValue
+                };
             }
 
-            (ParseState::SingleQuotedValue, None) |
-            (ParseState::DoubleQuotedValue, None) |
-            (ParseState::SingleQuotedValueEscape, None) |
-            (ParseState::DoubleQuotedValueEscape, None) |
-            (ParseState::NegatedSingleQuotedValue, None) |
-            (ParseState::NegatedDoubleQuotedValue, None) |
-            (ParseState::NegatedSingleQuotedValueEscape, None) |
-            (ParseState::NegatedDoubleQuotedValueEscape, None) => {
-                result.push(Term::new(state.is_negated(), key, format!(
-                    "{}{}{}",
-                    if state.is_single_quote() { "'" } else { "\"" },
-                    opts.decode_unicode(token),
-                    if state.is_escaped() { "\\" } else { "" },
-                )));
+            (ParseState::SingleQuotedValue, None)
+            | (ParseState::DoubleQuotedValue, None)
+            | (ParseState::SingleQuotedValueEscape, None)
+            | (ParseState::DoubleQuotedValueEscape, None)
+            | (ParseState::NegatedSingleQuotedValue, None)
+            | (ParseState::NegatedDoubleQuotedValue, None)
+            | (ParseState::NegatedSingleQuotedValueEscape, None)
+            | (ParseState::NegatedDoubleQuotedValueEscape, None) => {
+                result.push(Term::new(
+                    state.is_negated(),
+                    key,
+                    format!(
+                        "{}{}{}",
+                        if state.is_single_quote() { "'" } else { "\"" },
+                        opts.decode_unicode(token),
+                        if state.is_escaped() { "\\" } else { "" },
+                    ),
+                ));
                 break;
             }
-            (ParseState::SingleQuotedValueEscape, Some(ref ch)) |
-            (ParseState::DoubleQuotedValueEscape, Some(ref ch)) |
-            (ParseState::NegatedSingleQuotedValueEscape, Some(ref ch)) |
-            (ParseState::NegatedDoubleQuotedValueEscape, Some(ref ch)) => {
+            (ParseState::SingleQuotedValueEscape, Some(ref ch))
+            | (ParseState::DoubleQuotedValueEscape, Some(ref ch))
+            | (ParseState::NegatedSingleQuotedValueEscape, Some(ref ch))
+            | (ParseState::NegatedDoubleQuotedValueEscape, Some(ref ch)) => {
                 if !(*ch == '\'' || *ch == '"' || *ch == '\\') {
                     token.push('\\');
                 }
                 token.push(*ch);
                 state = state.unescape();
             }
-            (ParseState::SingleQuotedValue, Some(ref ch)) |
-            (ParseState::DoubleQuotedValue, Some(ref ch)) |
-            (ParseState::NegatedSingleQuotedValue, Some(ref ch)) |
-            (ParseState::NegatedDoubleQuotedValue, Some(ref ch)) => {
+            (ParseState::SingleQuotedValue, Some(ref ch))
+            | (ParseState::DoubleQuotedValue, Some(ref ch))
+            | (ParseState::NegatedSingleQuotedValue, Some(ref ch))
+            | (ParseState::NegatedDoubleQuotedValue, Some(ref ch)) => {
                 if opts.allow_backslash_quotes && *ch == '\\' {
                     state = state.escape();
                 } else {
@@ -587,7 +611,14 @@ fn parse_terms(raw: &str, opts: &ParseOptions) -> (Vec<Term>, Option<String>) {
         }
     }
 
-    (result, if raw == corrected { None } else { Some(corrected) })
+    (
+        result,
+        if raw == corrected {
+            None
+        } else {
+            Some(corrected)
+        },
+    )
 }
 
 #[cfg(test)]
@@ -597,7 +628,7 @@ mod tests {
     /// Test-only function for ergonomics on writing correction test cases.
     pub fn correct(raw: &str) -> Option<String> {
         let opts = ParseOptions::default();
-        if let Some(mut current)  = parse_terms(raw, &opts).1 {
+        if let Some(mut current) = parse_terms(raw, &opts).1 {
             for _i in 1..10 {
                 if let Some(next) = parse_terms(&current, &opts).1 {
                     current = next;
@@ -621,45 +652,132 @@ mod tests {
     #[test]
     fn negations() {
         assert_eq!(parse("-").terms, &[Term::new(false, None, "-")]);
-        assert_eq!(parse("- -").terms, &[Term::new(false, None, "-"), Term::new(false, None, "-")]);
+        assert_eq!(
+            parse("- -").terms,
+            &[Term::new(false, None, "-"), Term::new(false, None, "-")]
+        );
         assert_eq!(parse("--").terms, &[Term::new(true, None, "-")]);
         assert_eq!(parse("---").terms, &[Term::new(true, None, "--")]);
-        assert_eq!(parse("--- ---").terms, &[Term::new(true, None, "--"), Term::new(true, None, "--")]);
-        assert_eq!(parse("---:---").terms, &[Term::new(true, Some("--"), "---")]);
+        assert_eq!(
+            parse("--- ---").terms,
+            &[Term::new(true, None, "--"), Term::new(true, None, "--")]
+        );
+        assert_eq!(
+            parse("---:---").terms,
+            &[Term::new(true, Some("--"), "---")]
+        );
     }
 
     #[test]
     fn quoted() {
-        assert_eq!(parse("'hello' 'world'").terms, &[Term::new(false, None, "hello"), Term::new(false, None, "world")]);
-        assert_eq!(parse(" 'hello''world' ").terms, &[Term::new(false, None, "hello"), Term::new(false, None, "world")]);
-        assert_eq!(parse("\"hello\" \"world\"").terms, &[Term::new(false, None, "hello"), Term::new(false, None, "world")]);
-        assert_eq!(parse(" \"hello\"\"world\" ").terms, &[Term::new(false, None, "hello"), Term::new(false, None, "world")]);
+        assert_eq!(
+            parse("'hello' 'world'").terms,
+            &[
+                Term::new(false, None, "hello"),
+                Term::new(false, None, "world")
+            ]
+        );
+        assert_eq!(
+            parse(" 'hello''world' ").terms,
+            &[
+                Term::new(false, None, "hello"),
+                Term::new(false, None, "world")
+            ]
+        );
+        assert_eq!(
+            parse("\"hello\" \"world\"").terms,
+            &[
+                Term::new(false, None, "hello"),
+                Term::new(false, None, "world")
+            ]
+        );
+        assert_eq!(
+            parse(" \"hello\"\"world\" ").terms,
+            &[
+                Term::new(false, None, "hello"),
+                Term::new(false, None, "world")
+            ]
+        );
 
         assert_eq!(correct("'hello' 'world'"), None);
-        assert_eq!(correct(" 'hello''world' ").as_deref(), Some(" 'hello\\'\\'world' "));
+        assert_eq!(
+            correct(" 'hello''world' ").as_deref(),
+            Some(" 'hello\\'\\'world' ")
+        );
         assert_eq!(correct("\"hello\" \"world\""), None);
-        assert_eq!(correct(" \"hello\"\"world\" ").as_deref(), Some(" \"hello\\\"\\\"world\" "));
+        assert_eq!(
+            correct(" \"hello\"\"world\" ").as_deref(),
+            Some(" \"hello\\\"\\\"world\" ")
+        );
 
-        assert_eq!(parse("-'hello' 'world'").terms, &[Term::new(true, None, "hello"), Term::new(false, None, "world")]);
-        assert_eq!(parse(" 'hello'-'world' ").terms, &[Term::new(false, None, "hello"), Term::new(true, None, "world")]);
-        assert_eq!(parse("\"hello\" -\"world\"").terms, &[Term::new(false, None, "hello"), Term::new(true, None, "world")]);
-        assert_eq!(parse(" -\"hello\"-\"world\" ").terms, &[Term::new(true, None, "hello"), Term::new(true, None, "world")]);
+        assert_eq!(
+            parse("-'hello' 'world'").terms,
+            &[
+                Term::new(true, None, "hello"),
+                Term::new(false, None, "world")
+            ]
+        );
+        assert_eq!(
+            parse(" 'hello'-'world' ").terms,
+            &[
+                Term::new(false, None, "hello"),
+                Term::new(true, None, "world")
+            ]
+        );
+        assert_eq!(
+            parse("\"hello\" -\"world\"").terms,
+            &[
+                Term::new(false, None, "hello"),
+                Term::new(true, None, "world")
+            ]
+        );
+        assert_eq!(
+            parse(" -\"hello\"-\"world\" ").terms,
+            &[
+                Term::new(true, None, "hello"),
+                Term::new(true, None, "world")
+            ]
+        );
 
-        assert_eq!(correct("'I made a typ'o 'oh no!'").as_deref(), Some("'I made a typo' 'oh no!'"));
-        assert_eq!(correct("'I made a typ'o'graphical error'").as_deref(), Some("'I made a typ\\'o\\'graphical error'"));
+        assert_eq!(
+            correct("'I made a typ'o 'oh no!'").as_deref(),
+            Some("'I made a typo' 'oh no!'")
+        );
+        assert_eq!(
+            correct("'I made a typ'o'graphical error'").as_deref(),
+            Some("'I made a typ\\'o\\'graphical error'")
+        );
 
         let pc = |n, x| parse_with_options(x, ParseOptions::default().correction_passes(n));
-        assert_eq!(pc(1, "'I made a typ'o 'oh no!'").terms, &[Term::new(false, None, "I made a typo"), Term::new(false, None, "oh no!")]);
+        assert_eq!(
+            pc(1, "'I made a typ'o 'oh no!'").terms,
+            &[
+                Term::new(false, None, "I made a typo"),
+                Term::new(false, None, "oh no!")
+            ]
+        );
         // 2 corrections should escape both quotes, but only 1 correction only gets the first one.
-        assert_eq!(pc(2, "'abc'de'fgh'").terms, &[Term::new(false, None, "abc'de'fgh")]);
-        assert_eq!(pc(1, "'abc'de'fgh'").terms, &[Term::new(false, None, "abc'de"), Term::new(false, None, "fgh'")]);
+        assert_eq!(
+            pc(2, "'abc'de'fgh'").terms,
+            &[Term::new(false, None, "abc'de'fgh")]
+        );
+        assert_eq!(
+            pc(1, "'abc'de'fgh'").terms,
+            &[
+                Term::new(false, None, "abc'de"),
+                Term::new(false, None, "fgh'")
+            ]
+        );
 
         // This is a test that we don't try and make more than one suggestion in
         // a single pass.  This is necessary because our suggestions about
         // escaping quotes inherently cause a conceptual divergence in parse
         // state, so any suggestions made after the first might be moot.  This
         // case does test that we perform at least 2 correction passes.
-        assert_eq!(correct("'quote'\"danger\"'hat\"bat'").as_deref(), Some("'quote\\'\"danger\"\\'hat\"bat'"));
+        assert_eq!(
+            correct("'quote'\"danger\"'hat\"bat'").as_deref(),
+            Some("'quote\\'\"danger\"\\'hat\"bat'")
+        );
 
         // ## Potential for improvement
         // These are corrections where correction could do better but where the
@@ -689,65 +807,161 @@ mod tests {
         // that potentially involves searching for prose strings, it would
         // probably be better to have a more interactive query-builder UI that
         // can provide visual feedback about phrase boundaries, etc.
-        assert_eq!(correct("'didn't quote this well'").as_deref(), Some("'didnt' quote this well'"));
+        assert_eq!(
+            correct("'didn't quote this well'").as_deref(),
+            Some("'didnt' quote this well'")
+        );
     }
 
     #[test]
     fn raw_tokens() {
         assert_eq!(parse("hello").terms, &[Term::from_value("hello")]);
         assert_eq!(parse(" hello ").terms, &[Term::from_value("hello")]);
-        assert_eq!(parse(" hello world ").terms, &[Term::from_value("hello"), Term::from_value("world")]);
-        assert_eq!(parse("\rhello\nworld\t").terms, &[Term::from_value("hello"), Term::from_value("world")]);
+        assert_eq!(
+            parse(" hello world ").terms,
+            &[Term::from_value("hello"), Term::from_value("world")]
+        );
+        assert_eq!(
+            parse("\rhello\nworld\t").terms,
+            &[Term::from_value("hello"), Term::from_value("world")]
+        );
 
         assert_eq!(parse(" -hello ").terms, &[Term::new(true, None, "hello")]);
-        assert_eq!(parse(" -hello-world ").terms, &[Term::new(true, None, "hello-world")]);
-        assert_eq!(parse(" -hello -world ").terms, &[Term::new(true, None, "hello"), Term::new(true, None, "world")]);
+        assert_eq!(
+            parse(" -hello-world ").terms,
+            &[Term::new(true, None, "hello-world")]
+        );
+        assert_eq!(
+            parse(" -hello -world ").terms,
+            &[
+                Term::new(true, None, "hello"),
+                Term::new(true, None, "world")
+            ]
+        );
     }
 
     #[test]
     fn raw_values() {
-        assert_eq!(parse("key:value").terms, &[Term::new(false, Some("key"), "value")]);
-        assert_eq!(parse("key:value key2:value2").terms, &[Term::new(false, Some("key"), "value"), Term::new(false, Some("key2"), "value2")]);
-        assert_eq!(parse("key: anotherValue").terms, &[Term::new(false, Some("key"), ""), Term::new(false, None, "anotherValue")]);
-        assert_eq!(parse(" key:value ").terms, &[Term::new(false, Some("key"), "value")]);
+        assert_eq!(
+            parse("key:value").terms,
+            &[Term::new(false, Some("key"), "value")]
+        );
+        assert_eq!(
+            parse("key:value key2:value2").terms,
+            &[
+                Term::new(false, Some("key"), "value"),
+                Term::new(false, Some("key2"), "value2")
+            ]
+        );
+        assert_eq!(
+            parse("key: anotherValue").terms,
+            &[
+                Term::new(false, Some("key"), ""),
+                Term::new(false, None, "anotherValue")
+            ]
+        );
+        assert_eq!(
+            parse(" key:value ").terms,
+            &[Term::new(false, Some("key"), "value")]
+        );
 
-        assert_eq!(parse("-key:value").terms, &[Term::new(true, Some("key"), "value")]);
-        assert_eq!(parse(" -key:value ").terms, &[Term::new(true, Some("key"), "value")]);
-        assert_eq!(parse(" key:-value ").terms, &[Term::new(false, Some("key"), "-value")]);
-        assert_eq!(parse(" key:- ").terms, &[Term::new(false, Some("key"), "-")]);
+        assert_eq!(
+            parse("-key:value").terms,
+            &[Term::new(true, Some("key"), "value")]
+        );
+        assert_eq!(
+            parse(" -key:value ").terms,
+            &[Term::new(true, Some("key"), "value")]
+        );
+        assert_eq!(
+            parse(" key:-value ").terms,
+            &[Term::new(false, Some("key"), "-value")]
+        );
+        assert_eq!(
+            parse(" key:- ").terms,
+            &[Term::new(false, Some("key"), "-")]
+        );
     }
 
     #[test]
     fn double_colons() {
-        assert_eq!(parse("Class::method").terms, &[Term::new(false, Some("Class"), ":method")]);
-        assert_eq!(parse("'Class::method'").terms, &[Term::new(false, None, "Class::method")]);
+        assert_eq!(
+            parse("Class::method").terms,
+            &[Term::new(false, Some("Class"), ":method")]
+        );
+        assert_eq!(
+            parse("'Class::method'").terms,
+            &[Term::new(false, None, "Class::method")]
+        );
     }
 
     #[test]
     fn quoted_values() {
-        assert_eq!(parse("key:'value'").terms, &[Term::new(false, Some("key"), "value")]);
-        assert_eq!(parse("key:\"value with spaces\"").terms, &[Term::new(false, Some("key"), "value with spaces")]);
-        assert_eq!(parse("key:\"value\" key2:'another value'").terms, &[Term::new(false, Some("key"), "value"), Term::new(false, Some("key2"), "another value")]);
+        assert_eq!(
+            parse("key:'value'").terms,
+            &[Term::new(false, Some("key"), "value")]
+        );
+        assert_eq!(
+            parse("key:\"value with spaces\"").terms,
+            &[Term::new(false, Some("key"), "value with spaces")]
+        );
+        assert_eq!(
+            parse("key:\"value\" key2:'another value'").terms,
+            &[
+                Term::new(false, Some("key"), "value"),
+                Term::new(false, Some("key2"), "another value")
+            ]
+        );
 
-        assert_eq!(parse("-key:'value'").terms, &[Term::new(true, Some("key"), "value")]);
-        assert_eq!(parse("-key:\"value with spaces\"").terms, &[Term::new(true, Some("key"), "value with spaces")]);
-        assert_eq!(parse("key:\"value\" -key2:'another value'").terms, &[Term::new(false, Some("key"), "value"), Term::new(true, Some("key2"), "another value")]);
+        assert_eq!(
+            parse("-key:'value'").terms,
+            &[Term::new(true, Some("key"), "value")]
+        );
+        assert_eq!(
+            parse("-key:\"value with spaces\"").terms,
+            &[Term::new(true, Some("key"), "value with spaces")]
+        );
+        assert_eq!(
+            parse("key:\"value\" -key2:'another value'").terms,
+            &[
+                Term::new(false, Some("key"), "value"),
+                Term::new(true, Some("key2"), "another value")
+            ]
+        );
     }
 
     #[test]
     fn end_unexpectedly() {
         assert_eq!(parse(" -").terms, &[Term::new(false, None, "-")]);
         assert_eq!(parse("'hello").terms, &[Term::new(false, None, "'hello")]);
-        assert_eq!(parse("'hello\\").terms, &[Term::new(false, None, "'hello\\")]);
-        assert_eq!(parse("\"hello ").terms, &[Term::new(false, None, "\"hello ")]);
+        assert_eq!(
+            parse("'hello\\").terms,
+            &[Term::new(false, None, "'hello\\")]
+        );
+        assert_eq!(
+            parse("\"hello ").terms,
+            &[Term::new(false, None, "\"hello ")]
+        );
         assert_eq!(parse("hello\\").terms, &[Term::new(false, None, "hello\\")]);
         assert_eq!(parse("-'hello").terms, &[Term::new(true, None, "'hello")]);
-        assert_eq!(parse("-'hello\\").terms, &[Term::new(true, None, "'hello\\")]);
-        assert_eq!(parse("-\"hello ").terms, &[Term::new(true, None, "\"hello ")]);
+        assert_eq!(
+            parse("-'hello\\").terms,
+            &[Term::new(true, None, "'hello\\")]
+        );
+        assert_eq!(
+            parse("-\"hello ").terms,
+            &[Term::new(true, None, "\"hello ")]
+        );
         assert_eq!(parse("-hello\\").terms, &[Term::new(true, None, "hello\\")]);
 
-        assert_eq!(parse("key:\"value ").terms, &[Term::new(false, Some("key"), "\"value ")]);
-        assert_eq!(parse("-key:'value ").terms, &[Term::new(true, Some("key"), "'value ")]);
+        assert_eq!(
+            parse("key:\"value ").terms,
+            &[Term::new(false, Some("key"), "\"value ")]
+        );
+        assert_eq!(
+            parse("-key:'value ").terms,
+            &[Term::new(true, Some("key"), "'value ")]
+        );
     }
 
     #[test]
@@ -755,14 +969,35 @@ mod tests {
         let p = |x| parse_with_options(x, ParseOptions::default().allow_unicode_escapes(false));
         let pu = |x| parse_with_options(x, ParseOptions::default().allow_unicode_escapes(true));
 
-        assert_eq!(p("\\u002021z").terms, &[Term::new(false, None, "\\u002021z")]);
-        assert_eq!(pu("\\u002021z").terms, &[Term::new(false, None, "\u{2021}z")]);
-        assert_eq!(pu("\\u00202xz").terms, &[Term::new(false, None, "\\u00202xz")]);
-        assert_eq!(pu("\\u00202z").terms, &[Term::new(false, None, "\\u00202z")]);
-        assert_eq!(pu("\\v002021z").terms, &[Term::new(false, None, "\\v002021z")]);
+        assert_eq!(
+            p("\\u002021z").terms,
+            &[Term::new(false, None, "\\u002021z")]
+        );
+        assert_eq!(
+            pu("\\u002021z").terms,
+            &[Term::new(false, None, "\u{2021}z")]
+        );
+        assert_eq!(
+            pu("\\u00202xz").terms,
+            &[Term::new(false, None, "\\u00202xz")]
+        );
+        assert_eq!(
+            pu("\\u00202z").terms,
+            &[Term::new(false, None, "\\u00202z")]
+        );
+        assert_eq!(
+            pu("\\v002021z").terms,
+            &[Term::new(false, None, "\\v002021z")]
+        );
 
-        assert_eq!(p("\\u002021:'\\u002022 \\u002023'").terms, &[Term::new(false, Some("\\u002021"), "\\u002022 \\u002023")]);
-        assert_eq!(pu("\\u002021:'\\u002022 \\u002023'").terms, &[Term::new(false, Some("\\u002021"), "\u{2022} \u{2023}")]);
+        assert_eq!(
+            p("\\u002021:'\\u002022 \\u002023'").terms,
+            &[Term::new(false, Some("\\u002021"), "\\u002022 \\u002023")]
+        );
+        assert_eq!(
+            pu("\\u002021:'\\u002022 \\u002023'").terms,
+            &[Term::new(false, Some("\\u002021"), "\u{2022} \u{2023}")]
+        );
     }
 
     #[test]
@@ -770,55 +1005,167 @@ mod tests {
         let p = |x| parse_with_options(x, ParseOptions::default().allow_backslash_quotes(false));
         let pe = |x| parse_with_options(x, ParseOptions::default().allow_backslash_quotes(true));
 
-        assert_eq!(pe(r#"'fred says \'hi\''"#).terms, &[Term::new(false, None, "fred says 'hi'")]);
-        assert_eq!(pe(r#""fred says \'hi\'""#).terms, &[Term::new(false, None, "fred says 'hi'")]);
-        assert_eq!(pe(r#""fred says \"hi\"""#).terms, &[Term::new(false, None, "fred says \"hi\"")]);
-        assert_eq!(pe(r#"'fred says \"hi\"'"#).terms, &[Term::new(false, None, "fred says \"hi\"")]);
-        assert_eq!(pe(r#"'backslashes \\ \n'"#).terms, &[Term::new(false, None, "backslashes \\ \\n")]);
-        assert_eq!(pe(r#""backslashes \\ \n""#).terms, &[Term::new(false, None, "backslashes \\ \\n")]);
+        assert_eq!(
+            pe(r#"'fred says \'hi\''"#).terms,
+            &[Term::new(false, None, "fred says 'hi'")]
+        );
+        assert_eq!(
+            pe(r#""fred says \'hi\'""#).terms,
+            &[Term::new(false, None, "fred says 'hi'")]
+        );
+        assert_eq!(
+            pe(r#""fred says \"hi\"""#).terms,
+            &[Term::new(false, None, "fred says \"hi\"")]
+        );
+        assert_eq!(
+            pe(r#"'fred says \"hi\"'"#).terms,
+            &[Term::new(false, None, "fred says \"hi\"")]
+        );
+        assert_eq!(
+            pe(r#"'backslashes \\ \n'"#).terms,
+            &[Term::new(false, None, "backslashes \\ \\n")]
+        );
+        assert_eq!(
+            pe(r#""backslashes \\ \n""#).terms,
+            &[Term::new(false, None, "backslashes \\ \\n")]
+        );
 
-        assert_eq!(p(r#"'fred says \'hi\''"#).terms, &[Term::new(false, None, "fred says \\"), Term::new(false, None, "hi\\''")]);
-        assert_eq!(p(r#""fred says \'hi\'""#).terms, &[Term::new(false, None, "fred says \\'hi\\'")]);
-        assert_eq!(p(r#""fred says \"hi\"""#).terms, &[Term::new(false, None, "fred says \\"), Term::new(false, None, "hi\\\"\"")]);
-        assert_eq!(p(r#"'fred says \"hi\"'"#).terms, &[Term::new(false, None, "fred says \\\"hi\\\"")]);
-        assert_eq!(p(r#"'backslashes \\ \n'"#).terms, &[Term::new(false, None, "backslashes \\\\ \\n")]);
-        assert_eq!(p(r#""backslashes \\ \n""#).terms, &[Term::new(false, None, "backslashes \\\\ \\n")]);
+        assert_eq!(
+            p(r#"'fred says \'hi\''"#).terms,
+            &[
+                Term::new(false, None, "fred says \\"),
+                Term::new(false, None, "hi\\''")
+            ]
+        );
+        assert_eq!(
+            p(r#""fred says \'hi\'""#).terms,
+            &[Term::new(false, None, "fred says \\'hi\\'")]
+        );
+        assert_eq!(
+            p(r#""fred says \"hi\"""#).terms,
+            &[
+                Term::new(false, None, "fred says \\"),
+                Term::new(false, None, "hi\\\"\"")
+            ]
+        );
+        assert_eq!(
+            p(r#"'fred says \"hi\"'"#).terms,
+            &[Term::new(false, None, "fred says \\\"hi\\\"")]
+        );
+        assert_eq!(
+            p(r#"'backslashes \\ \n'"#).terms,
+            &[Term::new(false, None, "backslashes \\\\ \\n")]
+        );
+        assert_eq!(
+            p(r#""backslashes \\ \n""#).terms,
+            &[Term::new(false, None, "backslashes \\\\ \\n")]
+        );
 
-        assert_eq!(pe(r#"in\"a\\raw\nword"#).terms, &[Term::new(false, None, "in\\\"a\\\\raw\\nword")]);
-        assert_eq!(p(r#"in\"a\\raw\nword"#).terms, &[Term::new(false, None, "in\\\"a\\\\raw\\nword")]);
+        assert_eq!(
+            pe(r#"in\"a\\raw\nword"#).terms,
+            &[Term::new(false, None, "in\\\"a\\\\raw\\nword")]
+        );
+        assert_eq!(
+            p(r#"in\"a\\raw\nword"#).terms,
+            &[Term::new(false, None, "in\\\"a\\\\raw\\nword")]
+        );
 
-        assert_eq!(pe(r#"fred:'\'hi\''"#).terms, &[Term::new(false, Some("fred"), "'hi'")]);
-        assert_eq!(pe(r#"fred:"\'hi\'""#).terms, &[Term::new(false, Some("fred"), "'hi'")]);
-        assert_eq!(pe(r#"fred:"\"hi\"""#).terms, &[Term::new(false, Some("fred"), "\"hi\"")]);
-        assert_eq!(pe(r#"fred:'\"hi\"'"#).terms, &[Term::new(false, Some("fred"), "\"hi\"")]);
-        assert_eq!(pe(r#"back:'slashes \\ \n'"#).terms, &[Term::new(false, Some("back"), "slashes \\ \\n")]);
-        assert_eq!(pe(r#"back:"slashes \\ \n""#).terms, &[Term::new(false, Some("back"), "slashes \\ \\n")]);
+        assert_eq!(
+            pe(r#"fred:'\'hi\''"#).terms,
+            &[Term::new(false, Some("fred"), "'hi'")]
+        );
+        assert_eq!(
+            pe(r#"fred:"\'hi\'""#).terms,
+            &[Term::new(false, Some("fred"), "'hi'")]
+        );
+        assert_eq!(
+            pe(r#"fred:"\"hi\"""#).terms,
+            &[Term::new(false, Some("fred"), "\"hi\"")]
+        );
+        assert_eq!(
+            pe(r#"fred:'\"hi\"'"#).terms,
+            &[Term::new(false, Some("fred"), "\"hi\"")]
+        );
+        assert_eq!(
+            pe(r#"back:'slashes \\ \n'"#).terms,
+            &[Term::new(false, Some("back"), "slashes \\ \\n")]
+        );
+        assert_eq!(
+            pe(r#"back:"slashes \\ \n""#).terms,
+            &[Term::new(false, Some("back"), "slashes \\ \\n")]
+        );
 
-        assert_eq!(p(r#"fred:'\'hi\''"#).terms, &[Term::new(false, Some("fred"), "\\"), Term::new(false, None, "hi\\''")]);
-        assert_eq!(p(r#"fred:"\'hi\'""#).terms, &[Term::new(false, Some("fred"), "\\'hi\\'")]);
-        assert_eq!(p(r#"fred:"\"hi\"""#).terms, &[Term::new(false, Some("fred"), "\\"), Term::new(false, None, "hi\\\"\"")]);
-        assert_eq!(p(r#"fred:'\"hi\"'"#).terms, &[Term::new(false, Some("fred"), "\\\"hi\\\"")]);
-        assert_eq!(p(r#"back:'slashes \\ \n'"#).terms, &[Term::new(false, Some("back"), "slashes \\\\ \\n")]);
-        assert_eq!(p(r#"back:"slashes \\ \n""#).terms, &[Term::new(false, Some("back"), "slashes \\\\ \\n")]);
+        assert_eq!(
+            p(r#"fred:'\'hi\''"#).terms,
+            &[
+                Term::new(false, Some("fred"), "\\"),
+                Term::new(false, None, "hi\\''")
+            ]
+        );
+        assert_eq!(
+            p(r#"fred:"\'hi\'""#).terms,
+            &[Term::new(false, Some("fred"), "\\'hi\\'")]
+        );
+        assert_eq!(
+            p(r#"fred:"\"hi\"""#).terms,
+            &[
+                Term::new(false, Some("fred"), "\\"),
+                Term::new(false, None, "hi\\\"\"")
+            ]
+        );
+        assert_eq!(
+            p(r#"fred:'\"hi\"'"#).terms,
+            &[Term::new(false, Some("fred"), "\\\"hi\\\"")]
+        );
+        assert_eq!(
+            p(r#"back:'slashes \\ \n'"#).terms,
+            &[Term::new(false, Some("back"), "slashes \\\\ \\n")]
+        );
+        assert_eq!(
+            p(r#"back:"slashes \\ \n""#).terms,
+            &[Term::new(false, Some("back"), "slashes \\\\ \\n")]
+        );
 
-        assert_eq!(pe(r#"raw:in\"a\\raw\nword"#).terms, &[Term::new(false, Some("raw"), "in\\\"a\\\\raw\\nword")]);
-        assert_eq!(p(r#"raw:in\"a\\raw\nword"#).terms, &[Term::new(false, Some("raw"), "in\\\"a\\\\raw\\nword")]);
+        assert_eq!(
+            pe(r#"raw:in\"a\\raw\nword"#).terms,
+            &[Term::new(false, Some("raw"), "in\\\"a\\\\raw\\nword")]
+        );
+        assert_eq!(
+            p(r#"raw:in\"a\\raw\nword"#).terms,
+            &[Term::new(false, Some("raw"), "in\\\"a\\\\raw\\nword")]
+        );
     }
 
     #[test]
     fn parse_unicode_and_escape() {
-        let p = |x| parse_with_options(
-            x,
-            ParseOptions::default().allow_unicode_escapes(true).allow_backslash_quotes(true)
-        );
+        let p = |x| {
+            parse_with_options(
+                x,
+                ParseOptions::default()
+                    .allow_unicode_escapes(true)
+                    .allow_backslash_quotes(true),
+            )
+        };
 
-        assert_eq!(p(r#"fred:"\'sup \u01F436""#).terms, &[Term::new(false, Some("fred"), "'sup \u{1F436}")]);
-        assert_eq!(p(r#"fred:"\'sup \\u01F436""#).terms, &[Term::new(false, Some("fred"), "'sup \u{1F436}")]);
-        assert_eq!(p(r#"fred:"\'sup \u00005cu01F436""#).terms, &[Term::new(false, Some("fred"), "'sup \\u01F436")]);
+        assert_eq!(
+            p(r#"fred:"\'sup \u01F436""#).terms,
+            &[Term::new(false, Some("fred"), "'sup \u{1F436}")]
+        );
+        assert_eq!(
+            p(r#"fred:"\'sup \\u01F436""#).terms,
+            &[Term::new(false, Some("fred"), "'sup \u{1F436}")]
+        );
+        assert_eq!(
+            p(r#"fred:"\'sup \u00005cu01F436""#).terms,
+            &[Term::new(false, Some("fred"), "'sup \\u01F436")]
+        );
     }
 
     #[test]
     fn readme_example() {
-        println!("{:?}", parse("from:foo -subject:'a long subject \\u00270c' baz"));
+        println!(
+            "{:?}",
+            parse("from:foo -subject:'a long subject \\u00270c' baz")
+        );
     }
 }
