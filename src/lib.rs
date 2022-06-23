@@ -41,6 +41,7 @@ impl Term {
 pub struct ParseOptions {
     allow_backslash_quotes: bool,
     allow_unicode_escapes: bool,
+    correction_passes: u32,
 }
 
 impl ParseOptions {
@@ -48,6 +49,7 @@ impl ParseOptions {
         Self {
             allow_backslash_quotes: true,
             allow_unicode_escapes: true,
+            correction_passes: 0,
         }
     }
 
@@ -71,6 +73,13 @@ impl ParseOptions {
         self.allow_unicode_escapes = allow;
         self
     }
+
+    /// If non-zero, then this number of correction passes will be applied.
+    /// If zero (default), then the parse will not apply any corrections.
+    pub fn correction_passes(&mut self, num_passes: u32) -> &mut ParseOptions {
+        self.correction_passes = num_passes;
+        self
+    }
 }
 
 pub fn parse(raw: &str) -> Query {
@@ -78,9 +87,37 @@ pub fn parse(raw: &str) -> Query {
 }
 
 pub fn parse_with_options(raw: &str, opts: &ParseOptions) -> Query {
-    Query {
-        raw_query: String::from(raw),
-        terms: parse_terms(raw, opts).0,
+    if opts.correction_passes == 0 {
+        return Query {
+            raw_query: String::from(raw),
+            terms: parse_terms(raw, opts).0,
+        };
+    }
+    match parse_terms(raw, opts) {
+        (mut terms, Some(mut correction)) => {
+            for _i in 0..opts.correction_passes {
+                match parse_terms(&correction, opts) {
+                    (new_terms, Some(new_correction)) => {
+                        terms = new_terms;
+                        correction = new_correction;
+                    }
+                    (new_terms, None) => {
+                        terms = new_terms;
+                        break;
+                    }
+                }
+            }
+            Query {
+                raw_query: correction,
+                terms,
+            }
+        }
+        (terms, None) => {
+            Query {
+                raw_query: String::from(raw),
+                terms,
+            }
+        }
     }
 }
 
@@ -407,7 +444,7 @@ fn parse_terms(raw: &str, opts: &ParseOptions) -> (Vec<Term>, Option<String>) {
                         // means injecting a backslash.
                         _ => {
                             corrected.push('\\');
-                            // Escaping a quote will cause parse divergense, so
+                            // Escaping a quote will cause parse divergence, so
                             // this is the last correction we can make this pass.
                             correction_enabled = false;
                         }
@@ -611,12 +648,48 @@ mod tests {
         assert_eq!(correct("'I made a typ'o 'oh no!'").as_deref(), Some("'I made a typo' 'oh no!'"));
         assert_eq!(correct("'I made a typ'o'graphical error'").as_deref(), Some("'I made a typ\\'o\\'graphical error'"));
 
+        let pc = |n, x| parse_with_options(x, ParseOptions::default().correction_passes(n));
+        assert_eq!(pc(1, "'I made a typ'o 'oh no!'").terms, &[Term::new(false, None, "I made a typo"), Term::new(false, None, "oh no!")]);
+        // 2 corrections should escape both quotes, but only 1 correction only gets the first one.
+        assert_eq!(pc(2, "'abc'de'fgh'").terms, &[Term::new(false, None, "abc'de'fgh")]);
+        assert_eq!(pc(1, "'abc'de'fgh'").terms, &[Term::new(false, None, "abc'de"), Term::new(false, None, "fgh'")]);
+
         // This is a test that we don't try and make more than one suggestion in
         // a single pass.  This is necessary because our suggestions about
         // escaping quotes inherently cause a conceptual divergence in parse
         // state, so any suggestions made after the first might be moot.  This
         // case does test that we perform at least 2 correction passes.
         assert_eq!(correct("'quote'\"danger\"'hat\"bat'").as_deref(), Some("'quote\\'\"danger\"\\'hat\"bat'"));
+
+        // ## Potential for improvement
+        // These are corrections where correction could do better but where the
+        // uncorrected parse is also obvioulsy wrong so we don't need to
+        // immediately give up on corrections.
+
+        // ### Contractions
+        // Contractions are a huge problem.  Transposition correction activates
+        // here when the globally optimum choice would be escaping.  It's worth
+        // noting that the corrected query here is arguably a better situation
+        // for an error case because a query for 't' (uncorrected) is
+        // much more likely to result in any underlying search doing much more
+        // work and producing much less useful results unless the token is
+        // ignored for being too short.
+        //
+        // There are options for speculative transposition corrections that we
+        // convert into escaped quotes if the ongoing parse encounters a
+        // mismatched quote situation later on in the parse, but this won't work
+        // if there are an even number of un-escaped incorrectly quoted
+        // contractions.
+        //
+        // The most practical approach would probably be a limited dictionary
+        // that also operates on the word preceding the quote and distinguishes
+        // between `'` and `"`.   But terms like `Id` become a problem because
+        // `'I'd` also looks like a contraction.  As noted in the README about
+        // this correction, if you're building something like an email client
+        // that potentially involves searching for prose strings, it would
+        // probably be better to have a more interactive query-builder UI that
+        // can provide visual feedback about phrase boundaries, etc.
+        assert_eq!(correct("'didn't quote this well'").as_deref(), Some("'didnt' quote this well'"));
     }
 
     #[test]
