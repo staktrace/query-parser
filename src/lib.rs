@@ -80,7 +80,7 @@ pub fn parse(raw: &str) -> Query {
 pub fn parse_with_options(raw: &str, opts: &ParseOptions) -> Query {
     Query {
         raw_query: String::from(raw),
-        terms: parse_terms(raw, opts),
+        terms: parse_terms(raw, opts).0,
     }
 }
 
@@ -266,16 +266,40 @@ impl ParseOptions {
     }
 }
 
-fn parse_terms(raw: &str, opts: &ParseOptions) -> Vec<Term> {
+/// Returns the terms parsed from the provided "raw" string, plus a proposed
+/// corrected string that can be passed to this function again for parsing.  If
+/// the "raw" string already looked unambiguously correct then None will be
+/// returned instead of a corrected string.
+///
+/// Note that each correction pass may potentially may not be able to correct
+/// all ambiguities in the query string, so it may be advisable to repeatedly
+/// call this function until no more corrections are proposed.
+fn parse_terms(raw: &str, opts: &ParseOptions) -> (Vec<Term>, Option<String>) {
     let mut result = Vec::new();
 
     let mut state = ParseState::Initial;
     let mut key = None;
     let mut token = String::new();
 
+    // This is used to disable parsing after we make our first correction that
+    // would cause a divergence in parsing between our correction and the
+    // current parse.
+    let mut correction_enabled = true;
+    // The proposed correction string; if this ends up being the same as "raw"
+    // then we return None for our correction.
+    let mut corrected = String::new();
+    // The number of input tokens to skip propagating to `corrected` because of
+    // corrective actions taken.
+    let mut skip_propagating = 0;
+
     let mut c = raw.chars();
     loop {
-        match (state, c.next()) {
+        let next_c = c.next();
+        let write_as = match next_c {
+            Some(val) => val,
+            None => 0 as char,
+        };
+        match (state, next_c) {
             // Initial state handlers
             (ParseState::Initial, None) => {
                 break;
@@ -290,6 +314,7 @@ fn parse_terms(raw: &str, opts: &ParseOptions) -> Vec<Term> {
                 state = ParseState::DoubleQuote;
             }
             (ParseState::Initial, Some(ref ch)) if ch.is_ascii_whitespace() => {
+                corrected.push(*ch);
                 continue;
             }
             (ParseState::Initial, Some(ref ch)) => {
@@ -344,11 +369,52 @@ fn parse_terms(raw: &str, opts: &ParseOptions) -> Vec<Term> {
                 token.push(*ch);
                 state = state.unescape();
             }
-            (ParseState::SingleQuote, Some('\'')) |
-            (ParseState::DoubleQuote, Some('"')) |
-            (ParseState::NegatedSingleQuote, Some('\'')) |
-            (ParseState::NegatedDoubleQuote, Some('"')) => {
-                result.push(Term::new(state.is_negated(), None, opts.decode_unicode(token)));
+            (ParseState::SingleQuote, Some(qc @ '\'')) |
+            (ParseState::DoubleQuote, Some(qc @ '"')) |
+            (ParseState::NegatedSingleQuote, Some(qc @ '\'')) |
+            (ParseState::NegatedDoubleQuote, Some(qc @ '"')) |
+            (ParseState::SingleQuotedValue, Some(qc @ '\'')) |
+            (ParseState::DoubleQuotedValue, Some(qc @ '"')) |
+            (ParseState::NegatedSingleQuotedValue, Some(qc @ '\'')) |
+            (ParseState::NegatedDoubleQuotedValue, Some(qc @ '"')) => {
+                // We have a simple heuristic for noting potential typos as it
+                // relates to closing quotes: if there's not a space or the end
+                // of the string after the quote (and we're currently in a
+                // quoted string, as we are), then you probably made:
+                // - A transposition typo.  Ex: `'fo'o` should be `'foo'`.
+                // - A quoting error, like `'don't'` should have the single
+                //   quote escaped if using single quotes, or it should have
+                //   been quoted using double-quotes.  For simplicity, we just
+                //   escape the quote.
+                if correction_enabled {
+                    let mut lookahead = c.clone();
+                    match (lookahead.next(), lookahead.next()) {
+                        // If the next character is whitespace or the end of the
+                        // string, then this is a perfect parse, no action needed.
+                        (None, _) => {}
+                        (Some(ws), _) if ws.is_ascii_whitespace() => {}
+                        // If there's a non-whitespace character followed by whitespace,
+                        // that's transposition.
+                        (Some(ch), Some (ws)) if !ch.is_ascii_whitespace() && ws.is_ascii_whitespace() => {
+                            corrected.push(ch);
+                            corrected.push(qc);
+                            skip_propagating = 2;
+                            // Correcting the transposition will not cause parse
+                            // state to diverge so we can leave correction on.
+                        }
+                        // Anything else means neither character is whitespace,
+                        // which means we should just escape the quoting char, which
+                        // means injecting a backslash.
+                        _ => {
+                            corrected.push('\\');
+                            // Escaping a quote will cause parse divergense, so
+                            // this is the last correction we can make this pass.
+                            correction_enabled = false;
+                        }
+                    }
+                }
+                result.push(Term::new(state.is_negated(), key, opts.decode_unicode(token)));
+                key = None;
                 token = String::new();
                 state = ParseState::Initial;
             }
@@ -466,15 +532,6 @@ fn parse_terms(raw: &str, opts: &ParseOptions) -> Vec<Term> {
                 token.push(*ch);
                 state = state.unescape();
             }
-            (ParseState::SingleQuotedValue, Some('\'')) |
-            (ParseState::DoubleQuotedValue, Some('"')) |
-            (ParseState::NegatedSingleQuotedValue, Some('\'')) |
-            (ParseState::NegatedDoubleQuotedValue, Some('"')) => {
-                result.push(Term::new(state.is_negated(), key, opts.decode_unicode(token)));
-                key = None;
-                token = String::new();
-                state = ParseState::Initial;
-            }
             (ParseState::SingleQuotedValue, Some(ref ch)) |
             (ParseState::DoubleQuotedValue, Some(ref ch)) |
             (ParseState::NegatedSingleQuotedValue, Some(ref ch)) |
@@ -486,13 +543,36 @@ fn parse_terms(raw: &str, opts: &ParseOptions) -> Vec<Term> {
                 }
             }
         }
+        if skip_propagating > 0 {
+            skip_propagating -= 1;
+        } else {
+            corrected.push(write_as);
+        }
     }
-    result
+
+    (result, if raw == corrected { None } else { Some(corrected) })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Test-only function for ergonomics on writing correction test cases.
+    pub fn correct(raw: &str) -> Option<String> {
+        let opts = ParseOptions::default();
+        if let Some(mut current)  = parse_terms(raw, &opts).1 {
+            for _i in 1..10 {
+                if let Some(next) = parse_terms(&current, &opts).1 {
+                    current = next;
+                } else {
+                    break;
+                }
+            }
+            Some(current)
+        } else {
+            None
+        }
+    }
 
     #[test]
     fn empty() {
@@ -518,10 +598,25 @@ mod tests {
         assert_eq!(parse("\"hello\" \"world\"").terms, &[Term::new(false, None, "hello"), Term::new(false, None, "world")]);
         assert_eq!(parse(" \"hello\"\"world\" ").terms, &[Term::new(false, None, "hello"), Term::new(false, None, "world")]);
 
+        assert_eq!(correct("'hello' 'world'"), None);
+        assert_eq!(correct(" 'hello''world' ").as_deref(), Some(" 'hello\\'\\'world' "));
+        assert_eq!(correct("\"hello\" \"world\""), None);
+        assert_eq!(correct(" \"hello\"\"world\" ").as_deref(), Some(" \"hello\\\"\\\"world\" "));
+
         assert_eq!(parse("-'hello' 'world'").terms, &[Term::new(true, None, "hello"), Term::new(false, None, "world")]);
         assert_eq!(parse(" 'hello'-'world' ").terms, &[Term::new(false, None, "hello"), Term::new(true, None, "world")]);
         assert_eq!(parse("\"hello\" -\"world\"").terms, &[Term::new(false, None, "hello"), Term::new(true, None, "world")]);
         assert_eq!(parse(" -\"hello\"-\"world\" ").terms, &[Term::new(true, None, "hello"), Term::new(true, None, "world")]);
+
+        assert_eq!(correct("'I made a typ'o 'oh no!'").as_deref(), Some("'I made a typo' 'oh no!'"));
+        assert_eq!(correct("'I made a typ'o'graphical error'").as_deref(), Some("'I made a typ\\'o\\'graphical error'"));
+
+        // This is a test that we don't try and make more than one suggestion in
+        // a single pass.  This is necessary because our suggestions about
+        // escaping quotes inherently cause a conceptual divergence in parse
+        // state, so any suggestions made after the first might be moot.  This
+        // case does test that we perform at least 2 correction passes.
+        assert_eq!(correct("'quote'\"danger\"'hat\"bat'").as_deref(), Some("'quote\\'\"danger\"\\'hat\"bat'"));
     }
 
     #[test]
