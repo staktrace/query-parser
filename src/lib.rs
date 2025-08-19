@@ -255,7 +255,7 @@ fn decode_unicode_escape(s: &str, ix: usize) -> Option<char> {
     None
 }
 
-fn decode_unicode_escapes(mut s: &str) -> Cow<str> {
+fn decode_unicode_escapes(mut s: &str) -> Cow<'_, str> {
     let mut ret = Cow::Borrowed(s);
     loop {
         if let Some(ix) = s.find('\\') {
