@@ -44,15 +44,17 @@ pub struct ParseOptions {
     correction_passes: u32,
 }
 
-impl ParseOptions {
-    pub fn default() -> Self {
+impl Default for ParseOptions {
+    fn default() -> Self {
         Self {
             allow_backslash_quotes: true,
             allow_unicode_escapes: true,
             correction_passes: 0,
         }
     }
+}
 
+impl ParseOptions {
     /// Allows single- and double-quote characters to be escaped inside quoted strings by
     /// preceding them with a backslash. Similarly, backslash characters themselves can be
     /// escaped inside quoted strings by preceding them with a backslash. Note that if a
